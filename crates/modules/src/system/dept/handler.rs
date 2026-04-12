@@ -2,15 +2,13 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::ApiResponse;
 use framework::{require_authenticated, require_permission};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 #[utoipa::path(post, path = "/system/dept/", tag = "部门管理",
     summary = "新增部门",
@@ -101,39 +99,13 @@ pub(crate) async fn remove(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        // CRITICAL: literal-prefix routes MUST be registered BEFORE wildcard `/{id}` routes.
-        .route(
-            "/system/dept/",
-            post(create).route_layer(require_permission!("system:dept:add")),
-        )
-        .route(
-            "/system/dept/",
-            put(update).route_layer(require_permission!("system:dept:edit")),
-        )
-        .route(
-            "/system/dept/list",
-            get(list).route_layer(require_permission!("system:dept:list")),
-        )
-        .route(
-            "/system/dept/option-select",
-            get(option_select).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/dept/list/exclude/{id}",
-            get(exclude_list).route_layer(require_permission!("system:dept:exclude-list")),
-        )
-        .route(
-            "/system/dept/{id}",
-            get(find_by_id).route_layer(require_permission!("system:dept:query")),
-        )
-        .route(
-            "/system/dept/{id}",
-            delete(remove).route_layer(require_permission!("system:dept:remove")),
-        )
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(create).layer(require_permission!("system:dept:add")))
+        .routes(routes!(update).layer(require_permission!("system:dept:edit")))
+        .routes(routes!(list).layer(require_permission!("system:dept:list")))
+        .routes(routes!(option_select).layer(require_authenticated!()))
+        .routes(routes!(exclude_list).layer(require_permission!("system:dept:exclude-list")))
+        .routes(routes!(find_by_id).layer(require_permission!("system:dept:query")))
+        .routes(routes!(remove).layer(require_permission!("system:dept:remove")))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(create, update, list, option_select, exclude_list, find_by_id, remove))]
-pub struct DeptApi;

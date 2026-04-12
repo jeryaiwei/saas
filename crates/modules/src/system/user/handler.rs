@@ -2,16 +2,14 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::auth::Role;
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_authenticated, require_permission, require_role};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 #[utoipa::path(get, path = "/system/user/{id}", tag = "用户管理",
     summary = "查询用户详情",
@@ -154,66 +152,17 @@ pub(crate) async fn update_auth_role(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/system/user/",
-            post(create).route_layer(require_permission!("system:user:add")),
-        )
-        .route(
-            "/system/user/",
-            put(update).route_layer(require_permission!("system:user:edit")),
-        )
-        .route(
-            "/system/user/list",
-            get(list).route_layer(require_permission!("system:user:list")),
-        )
-        .route(
-            "/system/user/option-select",
-            get(option_select).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/user/info",
-            get(info).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/user/change-status",
-            put(change_status).route_layer(require_role!(Role::TenantAdmin)),
-        )
-        .route(
-            "/system/user/reset-pwd",
-            put(reset_password).route_layer(require_role!(Role::TenantAdmin)),
-        )
-        .route(
-            "/system/user/auth-role",
-            put(update_auth_role).route_layer(require_role!(Role::TenantAdmin)),
-        )
-        .route(
-            "/system/user/auth-role/{id}",
-            get(auth_role).route_layer(require_role!(Role::TenantAdmin)),
-        )
-        .route(
-            "/system/user/{id}",
-            get(find_by_id).route_layer(require_permission!("system:user:query")),
-        )
-        .route(
-            "/system/user/{id}",
-            delete(remove).route_layer(require_role!(Role::TenantAdmin)),
-        )
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(create).layer(require_permission!("system:user:add")))
+        .routes(routes!(update).layer(require_permission!("system:user:edit")))
+        .routes(routes!(list).layer(require_permission!("system:user:list")))
+        .routes(routes!(option_select).layer(require_authenticated!()))
+        .routes(routes!(info).layer(require_authenticated!()))
+        .routes(routes!(change_status).layer(require_role!(Role::TenantAdmin)))
+        .routes(routes!(reset_password).layer(require_role!(Role::TenantAdmin)))
+        .routes(routes!(update_auth_role).layer(require_role!(Role::TenantAdmin)))
+        .routes(routes!(auth_role).layer(require_role!(Role::TenantAdmin)))
+        .routes(routes!(find_by_id).layer(require_permission!("system:user:query")))
+        .routes(routes!(remove).layer(require_role!(Role::TenantAdmin)))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(
-    find_by_id,
-    list,
-    option_select,
-    info,
-    create,
-    update,
-    change_status,
-    remove,
-    reset_password,
-    auth_role,
-    update_auth_role
-))]
-pub struct UserApi;

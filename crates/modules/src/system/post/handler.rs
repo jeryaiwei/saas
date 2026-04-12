@@ -2,15 +2,13 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_authenticated, require_permission};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 #[utoipa::path(post, path = "/system/post/", tag = "岗位管理",
     summary = "新增岗位",
@@ -88,34 +86,12 @@ pub(crate) async fn remove(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/system/post/",
-            post(create).route_layer(require_permission!("system:post:add")),
-        )
-        .route(
-            "/system/post/",
-            put(update).route_layer(require_permission!("system:post:edit")),
-        )
-        .route(
-            "/system/post/list",
-            get(list).route_layer(require_permission!("system:post:list")),
-        )
-        .route(
-            "/system/post/option-select",
-            get(option_select).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/post/{id}",
-            get(find_by_id).route_layer(require_permission!("system:post:query")),
-        )
-        .route(
-            "/system/post/{id}",
-            delete(remove).route_layer(require_permission!("system:post:remove")),
-        )
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(create).layer(require_permission!("system:post:add")))
+        .routes(routes!(update).layer(require_permission!("system:post:edit")))
+        .routes(routes!(list).layer(require_permission!("system:post:list")))
+        .routes(routes!(option_select).layer(require_authenticated!()))
+        .routes(routes!(find_by_id).layer(require_permission!("system:post:query")))
+        .routes(routes!(remove).layer(require_permission!("system:post:remove")))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(create, update, list, option_select, find_by_id, remove))]
-pub struct PostApi;

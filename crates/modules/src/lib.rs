@@ -12,47 +12,46 @@ pub use state::AppState;
 
 use axum::Router;
 use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
 
-/// Register all API modules. Adding a new module = adding one line here.
-/// Both the axum Router and the OpenAPI spec are derived from this single list.
-macro_rules! register_modules {
-    ($( $router:expr, $api:ty );+ $(;)?) => {
-        /// API-prefixed subset of the module routers — everything under `/api/v1`.
-        pub fn api_router() -> Router<AppState> {
-            let mut r = Router::new();
-            $( r = r.merge($router); )+
-            r
-        }
-
-        /// Merge per-module OpenAPI definitions into the global spec.
-        pub fn api_openapi() -> utoipa::openapi::OpenApi {
-            let mut doc = ApiDoc::openapi();
-            $( doc.merge(<$api>::openapi()); )+
-            doc
-        }
-    };
+/// Build the API router and OpenAPI spec together. Each module's `router()`
+/// returns an `OpenApiRouter` that carries both axum routes and OpenAPI paths.
+/// Adding a new module = adding one `.merge(...)` line here.
+fn api_openapi_router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .merge(auth::router())
+        .merge(system::config::router())
+        .merge(system::dept::router())
+        .merge(system::dict::router())
+        .merge(system::menu::router())
+        .merge(system::post::router())
+        .merge(system::role::router())
+        .merge(system::tenant::router())
+        .merge(system::tenant_package::router())
+        .merge(system::user::router())
 }
 
-register_modules! {
-    auth::router(),                        auth::handler::AuthApi;
-    system::config::router(),              system::config::handler::ConfigApi;
-    system::dept::router(),                system::dept::handler::DeptApi;
-    system::dict::router(),                system::dict::handler::DictApi;
-    system::menu::router(),                system::menu::handler::MenuApi;
-    system::post::router(),                system::post::handler::PostApi;
-    system::role::router(),                system::role::handler::RoleApi;
-    system::tenant::router(),              system::tenant::handler::TenantApi;
-    system::tenant_package::router(),      system::tenant_package::handler::TenantPackageApi;
-    system::user::router(),                system::user::handler::UserApi;
+/// Split into axum Router + OpenAPI spec. Called by `app::main`.
+pub fn api_router_and_openapi() -> (Router<AppState>, utoipa::openapi::OpenApi) {
+    let (router, mut api) = api_openapi_router().split_for_parts();
+    // Merge global info / tags / security from ApiDoc
+    let global = ApiDoc::openapi();
+    api.info = global.info;
+    api.tags = global.tags;
+    api.security = global.security;
+    if let Some(gc) = global.components {
+        let components = api.components.get_or_insert_with(Default::default);
+        components.security_schemes.extend(gc.security_schemes);
+    }
+    api.servers = global.servers;
+    (router, api)
 }
 
-/// Flat router used by the integration test harness — combines
-/// `api_router()` with the health routes and `with_state(state)` so that
-/// `router.oneshot(request)` in tests can hit any endpoint without
-/// needing to know about the production API prefix.
+/// Flat router used by the integration test harness.
 pub fn router(state: AppState) -> Router {
+    let (api_router, _) = api_router_and_openapi();
     Router::new()
-        .merge(api_router())
+        .merge(api_router)
         .merge(health::router())
         .with_state(state)
 }

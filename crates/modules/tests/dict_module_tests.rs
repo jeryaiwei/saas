@@ -142,7 +142,9 @@ async fn list_dict_types_paginated() {
         for i in 0..3 {
             let mut dto = make_create_type_dto(&format!("{suffix}-{i}"));
             dto.dict_name = format!("{PREFIX}list-{suffix}-{i}");
-            dict_service::create_type(&state, dto).await.expect("create");
+            dict_service::create_type(&state, dto)
+                .await
+                .expect("create");
         }
 
         let query = dict_dto::ListDictTypeDto {
@@ -154,9 +156,7 @@ async fn list_dict_types_paginated() {
                 page_size: 2,
             },
         };
-        let page = dict_service::list_types(&state, query)
-            .await
-            .expect("list");
+        let page = dict_service::list_types(&state, query).await.expect("list");
         assert_eq!(page.rows.len(), 2);
         assert!(page.total >= 3);
 
@@ -257,12 +257,9 @@ async fn find_dict_data_by_type() {
             .expect("create type");
 
         for i in 0..3 {
-            dict_service::create_data(
-                &state,
-                make_create_data_dto(&dict_type, &format!("v{i}")),
-            )
-            .await
-            .expect("create data");
+            dict_service::create_data(&state, make_create_data_dto(&dict_type, &format!("v{i}")))
+                .await
+                .expect("create data");
         }
 
         let by_type = dict_service::find_data_by_type(&state, &dict_type)

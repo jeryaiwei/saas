@@ -2,16 +2,14 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::auth::Role;
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_access, require_permission};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 #[utoipa::path(post, path = "/system/tenant/", tag = "租户管理",
     summary = "新增租户",
@@ -77,39 +75,20 @@ pub(crate) async fn remove(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/system/tenant/",
-            post(create).route_layer(require_access! {
-                permission: "system:tenant:add",
-                role: Role::PlatformAdmin,
-            }),
-        )
-        .route(
-            "/system/tenant/",
-            put(update).route_layer(require_permission!("system:tenant:edit")),
-        )
-        .route(
-            "/system/tenant/list",
-            get(list).route_layer(require_access! {
-                permission: "system:tenant:list",
-                role: Role::SuperAdmin,
-            }),
-        )
-        .route(
-            "/system/tenant/{id}",
-            get(find_by_id).route_layer(require_permission!("system:tenant:query")),
-        )
-        .route(
-            "/system/tenant/{id}",
-            delete(remove).route_layer(require_access! {
-                permission: "system:tenant:remove",
-                role: Role::PlatformAdmin,
-            }),
-        )
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(create).layer(require_access! {
+            permission: "system:tenant:add",
+            role: Role::PlatformAdmin,
+        }))
+        .routes(routes!(update).layer(require_permission!("system:tenant:edit")))
+        .routes(routes!(list).layer(require_access! {
+            permission: "system:tenant:list",
+            role: Role::SuperAdmin,
+        }))
+        .routes(routes!(find_by_id).layer(require_permission!("system:tenant:query")))
+        .routes(routes!(remove).layer(require_access! {
+            permission: "system:tenant:remove",
+            role: Role::PlatformAdmin,
+        }))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(create, update, list, find_by_id, remove))]
-pub struct TenantApi;

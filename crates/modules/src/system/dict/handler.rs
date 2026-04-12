@@ -6,15 +6,13 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_authenticated, require_permission};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 // ---------------------------------------------------------------------------
 // DictType handlers
@@ -178,74 +176,20 @@ pub(crate) async fn remove_data(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
         // --- DictType routes ---
-        .route(
-            "/system/dict/type",
-            post(create_type).route_layer(require_permission!("system:dict:add")),
-        )
-        .route(
-            "/system/dict/type",
-            put(update_type).route_layer(require_permission!("system:dict:edit")),
-        )
-        .route(
-            "/system/dict/type/list",
-            get(list_types).route_layer(require_permission!("system:dict:list")),
-        )
-        .route(
-            "/system/dict/type/option-select",
-            get(type_option_select).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/dict/type/{id}",
-            get(find_type_by_id).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/dict/type/{id}",
-            delete(remove_types).route_layer(require_permission!("system:dict:remove")),
-        )
+        .routes(routes!(create_type).layer(require_permission!("system:dict:add")))
+        .routes(routes!(update_type).layer(require_permission!("system:dict:edit")))
+        .routes(routes!(list_types).layer(require_permission!("system:dict:list")))
+        .routes(routes!(type_option_select).layer(require_authenticated!()))
+        .routes(routes!(find_type_by_id).layer(require_authenticated!()))
+        .routes(routes!(remove_types).layer(require_permission!("system:dict:remove")))
         // --- DictData routes ---
-        .route(
-            "/system/dict/data",
-            post(create_data).route_layer(require_permission!("system:dict-data:add")),
-        )
-        .route(
-            "/system/dict/data",
-            put(update_data).route_layer(require_permission!("system:dict-data:edit")),
-        )
-        .route(
-            "/system/dict/data/list",
-            get(list_data).route_layer(require_permission!("system:dict-data:list")),
-        )
-        // literal-prefix routes BEFORE wildcard
-        .route(
-            "/system/dict/data/type/{dict_type}",
-            get(find_data_by_type).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/dict/data/{id}",
-            get(find_data_by_id).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/dict/data/{id}",
-            delete(remove_data).route_layer(require_permission!("system:dict-data:remove")),
-        )
+        .routes(routes!(create_data).layer(require_permission!("system:dict-data:add")))
+        .routes(routes!(update_data).layer(require_permission!("system:dict-data:edit")))
+        .routes(routes!(list_data).layer(require_permission!("system:dict-data:list")))
+        .routes(routes!(find_data_by_type).layer(require_authenticated!()))
+        .routes(routes!(find_data_by_id).layer(require_authenticated!()))
+        .routes(routes!(remove_data).layer(require_permission!("system:dict-data:remove")))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(
-    create_type,
-    update_type,
-    list_types,
-    type_option_select,
-    find_type_by_id,
-    remove_types,
-    create_data,
-    update_data,
-    list_data,
-    find_data_by_id,
-    find_data_by_type,
-    remove_data
-))]
-pub struct DictApi;

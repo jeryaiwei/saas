@@ -22,6 +22,7 @@ uuid.workspace = true
 chrono.workspace = true
 async-trait.workspace = true
 utoipa.workspace = true
+utoipa-axum.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true }

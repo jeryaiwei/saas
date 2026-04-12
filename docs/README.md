@@ -22,7 +22,7 @@
 | 文档                                                              | 版本                     | 内容                                                                                                                          |
 | ----------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | [pagination-spec](framework/framework-pagination-spec.md)         | v1.0 + v1.1              | 分页类型 (PageQuery / PaginationParams / Page), filter struct 规范, into_page, with_timeout, reconcile_total, slow-query warn |
-| [pagination-indexes](framework/framework-pagination-indexes.md)   | v1.0                     | 每个 find_page 的索引依赖注册表                                                                                               |
+| [pagination-indexes](framework/framework-pagination-indexes.md)   | v1.0                     | 每个 find_page 的索引依赖表                                                                                                   |
 | [error-envelope-spec](framework/framework-error-envelope-spec.md) | v1.0                     | 统一 wire envelope (ApiResponse), AppError 5 variant, ResponseCode 段位, i18n 命名空间, FieldError 路径格式                   |
 | [observability-spec](framework/framework-observability-spec.md)   | v1.0 (plan 已写, 未执行) | root span 自动注入 request_id/tenant_id/user_id, span 字段命名宪法, event level 宪法, metric 命名约定, cardinality 预算       |
 | [repo-executor-spec](framework/framework-repo-executor-spec.md)   | v1.0                     | impl PgExecutor vs &PgPool vs &mut Transaction 选择规则, service 层事务边界, 禁止模式                                         |

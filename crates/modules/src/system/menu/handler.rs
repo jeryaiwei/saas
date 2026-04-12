@@ -2,15 +2,13 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::ApiResponse;
 use framework::{require_authenticated, require_permission};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 #[utoipa::path(post, path = "/system/menu/", tag = "菜单管理",
     summary = "新增菜单",
@@ -127,58 +125,17 @@ pub(crate) async fn remove(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        // CRITICAL: literal-prefix routes MUST be registered BEFORE wildcard `/{menuId}` routes.
-        .route(
-            "/system/menu/",
-            post(create).route_layer(require_permission!("system:menu:add")),
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(create).layer(require_permission!("system:menu:add")))
+        .routes(routes!(update).layer(require_permission!("system:menu:edit")))
+        .routes(routes!(list).layer(require_permission!("system:menu:list")))
+        .routes(routes!(tree_select).layer(require_permission!("system:menu:tree-select")))
+        .routes(
+            routes!(role_menu_tree_select).layer(require_permission!("system:menu:role-menu-tree")),
         )
-        .route(
-            "/system/menu/",
-            put(update).route_layer(require_permission!("system:menu:edit")),
-        )
-        .route(
-            "/system/menu/list",
-            get(list).route_layer(require_permission!("system:menu:list")),
-        )
-        .route(
-            "/system/menu/tree-select",
-            get(tree_select).route_layer(require_permission!("system:menu:tree-select")),
-        )
-        .route(
-            "/system/menu/role-menu-tree-select/{roleId}",
-            get(role_menu_tree_select)
-                .route_layer(require_permission!("system:menu:role-menu-tree")),
-        )
-        .route(
-            "/system/menu/tenant-package-menu-tree-select/{packageId}",
-            get(package_menu_tree_select).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/menu/cascade/{menuIds}",
-            delete(cascade_remove).route_layer(require_permission!("system:menu:cascade-remove")),
-        )
-        .route(
-            "/system/menu/{menuId}",
-            get(find_by_id).route_layer(require_permission!("system:menu:query")),
-        )
-        .route(
-            "/system/menu/{menuId}",
-            delete(remove).route_layer(require_permission!("system:menu:remove")),
-        )
+        .routes(routes!(package_menu_tree_select).layer(require_authenticated!()))
+        .routes(routes!(cascade_remove).layer(require_permission!("system:menu:cascade-remove")))
+        .routes(routes!(find_by_id).layer(require_permission!("system:menu:query")))
+        .routes(routes!(remove).layer(require_permission!("system:menu:remove")))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(
-    create,
-    update,
-    list,
-    tree_select,
-    role_menu_tree_select,
-    package_menu_tree_select,
-    cascade_remove,
-    find_by_id,
-    remove
-))]
-pub struct MenuApi;

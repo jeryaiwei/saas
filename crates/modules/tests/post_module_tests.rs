@@ -243,7 +243,9 @@ async fn option_select() {
             .await
             .expect("option_select");
         assert!(
-            options.iter().any(|p| p.post_code == format!("{PREFIX}{suffix}")),
+            options
+                .iter()
+                .any(|p| p.post_code == format!("{PREFIX}{suffix}")),
             "option_select should include the test post"
         );
 

@@ -8,15 +8,13 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Extension, State},
-    routing::{get, post},
-    Router,
-};
+use axum::extract::{Extension, State};
 use framework::auth::{JwtClaims, UserSession};
 use framework::error::AppError;
 use framework::extractors::ValidatedJson;
 use framework::response::ApiResponse;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 #[utoipa::path(post, path = "/auth/login", tag = "认证",
     summary = "用户登录",
@@ -66,14 +64,10 @@ pub(crate) async fn get_info(
     Ok(ApiResponse::ok(resp))
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/auth/login", post(login))
-        .route("/auth/code", get(get_code))
-        .route("/auth/logout", post(logout))
-        .route("/info", get(get_info))
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(login))
+        .routes(routes!(get_code))
+        .routes(routes!(logout))
+        .routes(routes!(get_info))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(login, get_code, logout, get_info))]
-pub struct AuthApi;

@@ -2,15 +2,13 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::require_permission;
 use framework::response::{ApiResponse, Page};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 #[utoipa::path(post, path = "/system/config/", tag = "配置管理",
     summary = "新增配置",
@@ -103,39 +101,14 @@ pub(crate) async fn remove(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/system/config/",
-            post(create).route_layer(require_permission!("system:config:add")),
-        )
-        .route(
-            "/system/config/",
-            put(update).route_layer(require_permission!("system:config:edit")),
-        )
-        .route(
-            "/system/config/key",
-            put(update_by_key).route_layer(require_permission!("system:config:edit-by-key")),
-        )
-        .route(
-            "/system/config/list",
-            get(list).route_layer(require_permission!("system:config:list")),
-        )
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(create).layer(require_permission!("system:config:add")))
+        .routes(routes!(update).layer(require_permission!("system:config:edit")))
+        .routes(routes!(update_by_key).layer(require_permission!("system:config:edit-by-key")))
+        .routes(routes!(list).layer(require_permission!("system:config:list")))
         // literal-prefix routes BEFORE wildcard `/{id}`
-        .route(
-            "/system/config/key/{config_key}",
-            get(find_by_key).route_layer(require_permission!("system:config:query-by-key")),
-        )
-        .route(
-            "/system/config/{id}",
-            get(find_by_id).route_layer(require_permission!("system:config:query")),
-        )
-        .route(
-            "/system/config/{id}",
-            delete(remove).route_layer(require_permission!("system:config:remove")),
-        )
+        .routes(routes!(find_by_key).layer(require_permission!("system:config:query-by-key")))
+        .routes(routes!(find_by_id).layer(require_permission!("system:config:query")))
+        .routes(routes!(remove).layer(require_permission!("system:config:remove")))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(create, update, update_by_key, list, find_by_id, find_by_key, remove))]
-pub struct ConfigApi;

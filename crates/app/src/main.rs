@@ -103,10 +103,11 @@ async fn main() -> anyhow::Result<()> {
     // contribute API-prefixed routes. Adding a new module only requires
     // updating `modules::api_router()`; both this binary and the test
     // harness pick up the change automatically.
+    let (api_router, openapi) = modules::api_router_and_openapi();
     let app = Router::new()
-        .nest(API_PREFIX, modules::api_router())
+        .nest(API_PREFIX, api_router)
         .merge(modules::health::router())
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", modules::api_openapi()))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
         .with_state(state)
         // innermost custom layers
         .layer(from_fn_with_state(tenant_state, tenant_mw::tenant_guard))

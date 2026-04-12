@@ -2,15 +2,13 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_authenticated, require_permission};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 #[utoipa::path(get, path = "/system/role/{id}", tag = "角色管理",
     summary = "查询角色详情",
@@ -153,66 +151,19 @@ pub(crate) async fn unassign_users(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/system/role/",
-            post(create).route_layer(require_permission!("system:role:add")),
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(create).layer(require_permission!("system:role:add")))
+        .routes(routes!(update).layer(require_permission!("system:role:edit")))
+        .routes(routes!(list).layer(require_permission!("system:role:list")))
+        .routes(routes!(option_select).layer(require_authenticated!()))
+        .routes(routes!(change_status).layer(require_permission!("system:role:change-status")))
+        .routes(routes!(allocated_users).layer(require_permission!("system:role:allocated-list")))
+        .routes(
+            routes!(unallocated_users).layer(require_permission!("system:role:unallocated-list")),
         )
-        .route(
-            "/system/role/",
-            put(update).route_layer(require_permission!("system:role:edit")),
-        )
-        .route(
-            "/system/role/list",
-            get(list).route_layer(require_permission!("system:role:list")),
-        )
-        .route(
-            "/system/role/option-select",
-            get(option_select).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/role/change-status",
-            put(change_status).route_layer(require_permission!("system:role:change-status")),
-        )
-        .route(
-            "/system/role/auth-user/allocated-list",
-            get(allocated_users).route_layer(require_permission!("system:role:allocated-list")),
-        )
-        .route(
-            "/system/role/auth-user/unallocated-list",
-            get(unallocated_users).route_layer(require_permission!("system:role:unallocated-list")),
-        )
-        .route(
-            "/system/role/auth-user/select-all",
-            put(assign_users).route_layer(require_permission!("system:role:select-auth-all")),
-        )
-        .route(
-            "/system/role/auth-user/cancel",
-            put(unassign_users).route_layer(require_permission!("system:role:cancel-auth")),
-        )
-        .route(
-            "/system/role/{id}",
-            get(find_by_id).route_layer(require_permission!("system:role:query")),
-        )
-        .route(
-            "/system/role/{id}",
-            delete(remove).route_layer(require_permission!("system:role:remove")),
-        )
+        .routes(routes!(assign_users).layer(require_permission!("system:role:select-auth-all")))
+        .routes(routes!(unassign_users).layer(require_permission!("system:role:cancel-auth")))
+        .routes(routes!(find_by_id).layer(require_permission!("system:role:query")))
+        .routes(routes!(remove).layer(require_permission!("system:role:remove")))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(
-    find_by_id,
-    list,
-    create,
-    update,
-    change_status,
-    remove,
-    option_select,
-    allocated_users,
-    unallocated_users,
-    assign_users,
-    unassign_users
-))]
-pub struct RoleApi;

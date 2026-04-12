@@ -2,15 +2,13 @@
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post, put},
-    Router,
-};
+use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_authenticated, require_permission};
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 #[utoipa::path(get, path = "/system/tenant-package/{id}", tag = "套餐管理",
     summary = "查询套餐详情",
@@ -88,34 +86,12 @@ pub(crate) async fn remove(
     Ok(ApiResponse::success())
 }
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/system/tenant-package/",
-            post(create).route_layer(require_permission!("system:tenant-package:add")),
-        )
-        .route(
-            "/system/tenant-package/",
-            put(update).route_layer(require_permission!("system:tenant-package:edit")),
-        )
-        .route(
-            "/system/tenant-package/list",
-            get(list).route_layer(require_permission!("system:tenant-package:list")),
-        )
-        .route(
-            "/system/tenant-package/option-select",
-            get(option_select).route_layer(require_authenticated!()),
-        )
-        .route(
-            "/system/tenant-package/{id}",
-            get(find_by_id).route_layer(require_permission!("system:tenant-package:query")),
-        )
-        .route(
-            "/system/tenant-package/{id}",
-            delete(remove).route_layer(require_permission!("system:tenant-package:remove")),
-        )
+pub fn router() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(create).layer(require_permission!("system:tenant-package:add")))
+        .routes(routes!(update).layer(require_permission!("system:tenant-package:edit")))
+        .routes(routes!(list).layer(require_permission!("system:tenant-package:list")))
+        .routes(routes!(option_select).layer(require_authenticated!()))
+        .routes(routes!(find_by_id).layer(require_permission!("system:tenant-package:query")))
+        .routes(routes!(remove).layer(require_permission!("system:tenant-package:remove")))
 }
-
-#[derive(utoipa::OpenApi)]
-#[openapi(paths(find_by_id, list, option_select, create, update, remove))]
-pub struct TenantPackageApi;
