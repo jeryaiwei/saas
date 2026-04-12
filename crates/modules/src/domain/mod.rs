@@ -7,13 +7,17 @@
 
 pub mod constants;
 pub mod entities;
+pub mod menu_repo;
 pub mod role_repo;
 pub mod tenant_package_repo;
 pub mod tenant_repo;
 pub mod user_repo;
 pub mod validators;
 
-pub use entities::{SysRole, SysTenant, SysTenantPackage, SysUser, SysUserTenant};
+pub use entities::{SysMenu, SysRole, SysTenant, SysTenantPackage, SysUser, SysUserTenant};
+pub use menu_repo::{
+    MenuInsertParams, MenuListFilter, MenuRepo, MenuTreeRow, MenuUpdateParams, RoleMenuTreeRow,
+};
 pub use role_repo::{
     AllocatedUserFilter, RoleInsertParams, RoleListFilter, RoleRepo, RoleUpdateParams,
 };

@@ -166,3 +166,28 @@ pub struct SysTenantPackage {
     pub update_at: DateTime<Utc>,
     pub remark: Option<String>,
 }
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysMenu {
+    pub menu_id: String,
+    pub menu_name: String,
+    pub parent_id: Option<String>,
+    pub order_num: i32,
+    pub path: String,
+    pub component: Option<String>,
+    pub query: String,
+    pub is_frame: String,
+    pub is_cache: String,
+    pub menu_type: String,
+    pub visible: String,
+    pub status: String,
+    pub perms: String,
+    pub icon: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+    pub del_flag: String,
+    pub i18n: Option<serde_json::Value>,
+}

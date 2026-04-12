@@ -22,6 +22,7 @@ use axum::Router;
 pub fn api_router() -> Router<AppState> {
     Router::new()
         .merge(auth::router())
+        .merge(system::menu::router())
         .merge(system::role::router())
         .merge(system::tenant::router())
         .merge(system::tenant_package::router())

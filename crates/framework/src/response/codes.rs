@@ -61,6 +61,9 @@ impl ResponseCode {
     pub const TENANT_PACKAGE_NAME_EXISTS: Self = Self(4022);
     pub const TENANT_PACKAGE_IN_USE: Self = Self(4023);
 
+    // --- 7000-7099 system module ---
+    pub const MENU_NOT_FOUND: Self = Self(7020);
+
     pub const fn as_i32(self) -> i32 {
         self.0
     }

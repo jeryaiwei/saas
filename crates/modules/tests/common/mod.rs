@@ -194,3 +194,26 @@ pub async fn cleanup_test_packages(pool: &PgPool, prefix: &str) {
         .await
         .expect("cleanup sys_tenant_package");
 }
+
+/// Cleanup helper — delete test menus and their `sys_role_menu` bindings.
+/// Matches `sys_menu.menu_name LIKE '{prefix}%'`.
+pub async fn cleanup_test_menus(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_menus: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query(
+        "DELETE FROM sys_role_menu WHERE menu_id IN \
+         (SELECT menu_id FROM sys_menu WHERE menu_name LIKE $1)",
+    )
+    .bind(&pattern)
+    .execute(pool)
+    .await
+    .expect("cleanup sys_role_menu for test menus");
+    sqlx::query("DELETE FROM sys_menu WHERE menu_name LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_menu");
+}

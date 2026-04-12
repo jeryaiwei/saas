@@ -245,6 +245,8 @@ mod tests {
             ResponseCode::TENANT_PACKAGE_CODE_EXISTS,
             ResponseCode::TENANT_PACKAGE_NAME_EXISTS,
             ResponseCode::TENANT_PACKAGE_IN_USE,
+            // 7000-7099 system module
+            ResponseCode::MENU_NOT_FOUND,
         ];
 
         for code in codes {
