@@ -124,7 +124,7 @@ DEBUG  — 内部状态、开发辅助信息、可以在生产 `level=debug` 短
          例：JWT decode 失败细节、i18n 查表结果、span 内联参数值
          频率上限：不限；默认 filter level 下不采集
 
-TRACE  — 极细粒度（目前 Tea-SaaS 不使用 trace level）
+TRACE  — 极细粒度（目前 SaaS 不使用 trace level）
 ```
 
 **补充规则**：
@@ -169,7 +169,7 @@ http_request [request_id, tenant_id=Empty, user_id=Empty, user_name=Empty, metho
 
 ### 2.4 Prometheus metric 命名规范
 
-**必须** 遵循 Prometheus 官方命名约定 + Tea-SaaS 扩展：
+**必须** 遵循 Prometheus 官方命名约定 + SaaS 扩展：
 
 ```
 <domain>_<subject>_<action>_<unit>{labels...}
@@ -517,7 +517,7 @@ v1.0 接受这些限制，不引入 `tracing-opentelemetry` 来解决。
 
 ### 8.2 `info_span!` 的成本
 
-每个请求一个 root span 的成本：约 1 KB 分配 + subscribe 遍历。Tea-SaaS 的目标吞吐（几百 RPS）远低于 tracing 的 overhead 阈值（10K RPS）。不担心。
+每个请求一个 root span 的成本：约 1 KB 分配 + subscribe 遍历。SaaS 的目标吞吐（几百 RPS）远低于 tracing 的 overhead 阈值（10K RPS）。不担心。
 
 ### 8.3 Cardinality 审查的手动纪律
 

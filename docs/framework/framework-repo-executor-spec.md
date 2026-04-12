@@ -1,4 +1,4 @@
-# Tea-SaaS Repository Executor 规范 v1.0
+# SaaS Repository Executor 规范 v1.0
 
 **生效日期**：2026-04-12
 **状态**：Normative（规范性）

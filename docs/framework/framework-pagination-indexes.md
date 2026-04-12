@@ -183,6 +183,43 @@ LIMIT $4 OFFSET $5;
 
 ---
 
+## 5. `tenant_repo::find_page`
+
+**端点**: `GET /system/tenant/list`
+**目标表**: `sys_tenant t LEFT JOIN sys_tenant_package p`
+**SQL 形态**: SELECT + LEFT JOIN package (for package_name) + 5 optional filters + ORDER BY t.create_at DESC + LIMIT/OFFSET
+
+### 期望索引
+
+| 索引 | 列 | 用途 | 状态 |
+|---|---|---|---|
+| `pk_sys_tenant` | `id` | 主键 | 已存在 |
+| `idx_sys_tenant_create_at` | `sys_tenant(create_at DESC)` | 排序 | 待验证 |
+
+### 性能预期
+
+租户数通常 < 1k, seq scan 可接受。
+
+---
+
+## 6. `tenant_package_repo::find_page`
+
+**端点**: `GET /system/tenant-package/list`
+**目标表**: `sys_tenant_package`
+**SQL 形态**: SELECT + 2 optional filters + ORDER BY create_at DESC + LIMIT/OFFSET
+
+### 期望索引
+
+| 索引 | 列 | 用途 | 状态 |
+|---|---|---|---|
+| `pk_sys_tenant_package` | `package_id` | 主键 | 已存在 |
+
+### 性能预期
+
+套餐数通常 < 100, 不需要额外索引。
+
+---
+
 ## 待办事项
 
 **v1.1 完成**（2026-04-11）：
