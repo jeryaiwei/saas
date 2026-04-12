@@ -36,6 +36,34 @@ pub fn default_sex() -> String {
     "2".into()
 }
 
+/// Accept only `"Y"` (system built-in) or `"N"` (user-defined). Used by
+/// config DTOs whose `config_type` field maps to a `char(1)` DB column.
+pub fn validate_config_type(value: &str) -> Result<(), ValidationError> {
+    match value {
+        "Y" | "N" => Ok(()),
+        _ => Err(ValidationError::new("config_type")),
+    }
+}
+
+/// Accept only `"Y"` or `"N"` for dict data `is_default`. Used by dict
+/// data DTOs.
+pub fn validate_yes_no_flag(value: &str) -> Result<(), ValidationError> {
+    match value {
+        "Y" | "N" => Ok(()),
+        _ => Err(ValidationError::new("yes_no_flag")),
+    }
+}
+
+/// Accept only `"M"` (menu), `"C"` (directory), `"F"` (function). Used by
+/// menu DTOs whose `menu_type` field maps to a `char(1)` DB column.
+/// (Already validated at menu module — this is shared for reference.)
+pub fn validate_menu_type(value: &str) -> Result<(), ValidationError> {
+    match value {
+        "M" | "C" | "F" => Ok(()),
+        _ => Err(ValidationError::new("menu_type")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

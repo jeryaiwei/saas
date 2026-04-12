@@ -189,6 +189,79 @@ pub struct SysDept {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysPost {
+    pub post_id: String,
+    pub tenant_id: String,
+    pub dept_id: Option<String>,
+    pub post_code: String,
+    pub post_category: Option<String>,
+    pub post_name: String,
+    pub post_sort: i32,
+    pub status: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+    pub del_flag: String,
+    pub i18n: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysConfig {
+    pub config_id: String,
+    pub tenant_id: String,
+    pub config_name: String,
+    pub config_key: String,
+    pub config_value: String,
+    pub config_type: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+    pub status: String,
+    pub del_flag: String,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysDictType {
+    pub dict_id: String,
+    pub tenant_id: String,
+    pub dict_name: String,
+    pub dict_type: String,
+    pub status: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+    pub del_flag: String,
+    pub i18n: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysDictData {
+    pub dict_code: String,
+    pub tenant_id: String,
+    pub dict_sort: i32,
+    pub dict_label: String,
+    pub dict_value: String,
+    pub dict_type: String,
+    pub css_class: String,
+    pub list_class: String,
+    pub is_default: String,
+    pub status: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+    pub del_flag: String,
+    pub i18n: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
 pub struct SysMenu {
     pub menu_id: String,
     pub menu_name: String,

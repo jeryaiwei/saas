@@ -5,23 +5,36 @@
 //! here under `common.rs` have been promoted to `framework::context`
 //! (they're pure `RequestContext` readers with no domain knowledge).
 
+pub mod config_repo;
 pub mod constants;
 pub mod dept_repo;
+pub mod dict_data_repo;
+pub mod dict_type_repo;
 pub mod entities;
 pub mod menu_repo;
+pub mod post_repo;
 pub mod role_repo;
 pub mod tenant_package_repo;
 pub mod tenant_repo;
 pub mod user_repo;
 pub mod validators;
 
+pub use config_repo::{ConfigInsertParams, ConfigListFilter, ConfigRepo, ConfigUpdateParams};
 pub use dept_repo::{DeptInsertParams, DeptListFilter, DeptRepo, DeptUpdateParams};
+pub use dict_data_repo::{
+    DictDataInsertParams, DictDataListFilter, DictDataRepo, DictDataUpdateParams,
+};
+pub use dict_type_repo::{
+    DictTypeInsertParams, DictTypeListFilter, DictTypeRepo, DictTypeUpdateParams,
+};
 pub use entities::{
-    SysDept, SysMenu, SysRole, SysTenant, SysTenantPackage, SysUser, SysUserTenant,
+    SysConfig, SysDept, SysDictData, SysDictType, SysMenu, SysPost, SysRole, SysTenant,
+    SysTenantPackage, SysUser, SysUserTenant,
 };
 pub use menu_repo::{
     MenuInsertParams, MenuListFilter, MenuRepo, MenuTreeRow, MenuUpdateParams, RoleMenuTreeRow,
 };
+pub use post_repo::{PostInsertParams, PostListFilter, PostRepo, PostUpdateParams};
 pub use role_repo::{
     AllocatedUserFilter, RoleInsertParams, RoleListFilter, RoleRepo, RoleUpdateParams,
 };

@@ -11,7 +11,7 @@
 
 pub mod audit;
 
-pub use audit::{audit_update_by, current_tenant_scope, AuditInsert};
+pub use audit::{audit_update_by, current_platform_scope, current_tenant_scope, AuditInsert};
 
 use std::cell::RefCell;
 use std::future::Future;

@@ -210,6 +210,56 @@ pub async fn cleanup_test_depts(pool: &PgPool, prefix: &str) {
         .expect("cleanup sys_dept");
 }
 
+/// Cleanup helper — delete test posts.
+/// Matches `sys_post.post_code LIKE '{prefix}%'`.
+pub async fn cleanup_test_posts(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_posts: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_post WHERE post_code LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_post");
+}
+
+/// Cleanup helper — delete test configs.
+/// Matches `sys_config.config_key LIKE '{prefix}%'`.
+pub async fn cleanup_test_configs(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_configs: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_config WHERE config_key LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_config");
+}
+
+/// Cleanup helper — delete test dict data and dict types.
+/// Matches `sys_dict_type.dict_type LIKE '{prefix}%'`.
+pub async fn cleanup_test_dicts(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_dicts: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_dict_data WHERE dict_type LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_dict_data");
+    sqlx::query("DELETE FROM sys_dict_type WHERE dict_type LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_dict_type");
+}
+
 /// Cleanup helper — delete test menus and their `sys_role_menu` bindings.
 /// Matches `sys_menu.menu_name LIKE '{prefix}%'`.
 pub async fn cleanup_test_menus(pool: &PgPool, prefix: &str) {

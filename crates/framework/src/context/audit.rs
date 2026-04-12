@@ -58,6 +58,21 @@ pub fn current_tenant_scope() -> Option<String> {
     .flatten()
 }
 
+/// Current platform id for PLATFORM-scoped queries (SysConfig, SysDictType,
+/// SysDictData). Returns `None` when `run_ignoring_tenant` is in effect or
+/// when no context is in scope. Falls back to `tenant_id` when `platform_id`
+/// is not set (single-level tenant without explicit platform).
+pub fn current_platform_scope() -> Option<String> {
+    RequestContext::with_current(|c| {
+        if c.ignore_tenant {
+            None
+        } else {
+            c.platform_id.clone().or_else(|| c.tenant_id.clone())
+        }
+    })
+    .flatten()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

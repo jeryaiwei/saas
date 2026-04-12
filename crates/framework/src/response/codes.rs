@@ -66,6 +66,15 @@ impl ResponseCode {
     pub const DEPT_PARENT_NOT_FOUND: Self = Self(7014);
     pub const DEPT_NESTING_TOO_DEEP: Self = Self(7015);
     pub const MENU_NOT_FOUND: Self = Self(7020);
+    pub const DICT_TYPE_NOT_FOUND: Self = Self(7030);
+    pub const DICT_TYPE_EXISTS: Self = Self(7031);
+    pub const DICT_DATA_NOT_FOUND: Self = Self(7035);
+    pub const DICT_DATA_EXISTS: Self = Self(7036);
+    pub const CONFIG_NOT_FOUND: Self = Self(7040);
+    pub const CONFIG_KEY_EXISTS: Self = Self(7041);
+    pub const POST_NOT_FOUND: Self = Self(7050);
+    pub const POST_CODE_EXISTS: Self = Self(7051);
+    pub const POST_NAME_EXISTS: Self = Self(7052);
 
     pub const fn as_i32(self) -> i32 {
         self.0
