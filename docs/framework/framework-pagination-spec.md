@@ -231,12 +231,12 @@ pub async fn list(
 /// - `sys_user(create_at DESC) WHERE del_flag = '0'` — sort + soft-delete
 /// - `sys_user(user_name varchar_pattern_ops)` — LIKE prefix (not used for middle-match)
 ///
-/// See `docs/framework-pagination-indexes.md` for the global registry.
+/// See `docs/framework/framework-pagination-indexes.md` for the global registry.
 ///
 /// ## Consistency caveats
 /// Offset-based pagination is not snapshot-consistent. Concurrent
 /// inserts/deletes between page-N and page-(N+1) fetches may cause
-/// duplicate or missing rows. See `docs/framework-pagination-spec.md` §8.
+/// duplicate or missing rows. See `docs/framework/framework-pagination-spec.md` §8.
 ///
 /// ## Performance expectation
 /// - Shallow pages (offset < 1000): < 10ms on tenants up to 10k users
@@ -325,7 +325,7 @@ let count_sql = format!("SELECT COUNT(*) FROM sys_user u JOIN ... {USER_PAGE_WHE
 
 ### 5.2 数据库层索引声明汇总
 
-**必须** 维护一份 `docs/framework-pagination-indexes.md` 作为**全局真源**，列出每个 `find_page` 对应的索引名、创建它的 migration 文件、以及**索引缺失时的降级行为**。
+**必须** 维护一份 `docs/framework/framework-pagination-indexes.md` 作为**全局真源**，列出每个 `find_page` 对应的索引名、创建它的 migration 文件、以及**索引缺失时的降级行为**。
 
 **规则**：
 
@@ -521,7 +521,7 @@ const XXX_PAGE_WHERE: &str = "\
 
 **Step 6 — Handler 路由** + `require_permission!`
 
-**Step 7 — 在 `docs/framework-pagination-indexes.md` 追加索引声明**
+**Step 7 — 在 `docs/framework/framework-pagination-indexes.md` 追加索引声明**
 
 **Step 8 — Integration test** 覆盖空结果、尾页、深翻页（offset > total）三个边界
 
@@ -545,7 +545,7 @@ const XXX_PAGE_WHERE: &str = "\
 - [ ] 使用 `p.into_page(rows, total)` 收尾，无 `total as u64` 裸 cast
 - [ ] 有 `debug_assert!(rows.len() as i64 <= p.limit)` post-condition
 - [ ] 有 integration test 覆盖空结果 / 尾页 / 超范围页
-- [ ] `docs/framework-pagination-indexes.md` 已追加索引声明
+- [ ] `docs/framework/framework-pagination-indexes.md` 已追加索引声明
 - [ ] 对应 migration 已创建索引
 - [ ] `cargo clippy --all-targets -- -D warnings` 干净
 - [ ] `cargo test --workspace` 全绿

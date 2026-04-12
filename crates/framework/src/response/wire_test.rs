@@ -2,7 +2,7 @@
 //!
 //! These tests assert the serialized JSON key set, ordering, and camelCase
 //! conventions for every response path. They are the CI enforcement of
-//! `docs/framework-error-envelope-spec.md` §2.1 (single wire envelope) —
+//! `docs/framework/framework-error-envelope-spec.md` §2.1 (single wire envelope) —
 //! a PR that accidentally renames `msg` to `message` or adds a new
 //! top-level field without coordination will fail here, not in production.
 //!

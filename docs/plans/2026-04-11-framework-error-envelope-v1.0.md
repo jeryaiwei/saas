@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Bring the error + response envelope primitive into compliance with `docs/framework-error-envelope-spec.md` v1.0 — by unifying the two duplicate wire structs, deleting three confirmed dead capabilities, removing the implicit `From<anyhow::Error>` path, consolidating the status-code mapping into a single source, adding i18n coverage + wire regression tests.
+**Goal:** Bring the error + response envelope primitive into compliance with `docs/framework/framework-error-envelope-spec.md` v1.0 — by unifying the two duplicate wire structs, deleting three confirmed dead capabilities, removing the implicit `From<anyhow::Error>` path, consolidating the status-code mapping into a single source, adding i18n coverage + wire regression tests.
 
 **Architecture:** The framework currently has two near-identical response body structs (`ApiResponse<T>` and `ErrorBody`), three dead methods/fields (`ApiResponse::with_code`, `AppError::business_with_params`, `AppError::Business.{params,data}`), and an implicit `#[from] anyhow::Error` conversion that hides the "this is now a 500" decision behind `?`. v1.0 removes all of these, replaces `ErrorBody` with `ApiResponse<serde_json::Value>` so the wire contract has exactly one source of truth, and adds two new framework-level tests (i18n coverage + wire regression table-driven) so future drift is caught at CI time.
 
@@ -10,7 +10,7 @@
 
 **Baseline assumption:** All hygiene-pass and pagination v1.0 changes are already merged. Current test count is **153 passing**. Run `cd server-rs && cargo test --workspace 2>&1 | grep "test result"` before starting. If baseline is different, stop and investigate.
 
-**Spec reference:** `docs/framework-error-envelope-spec.md` §12 — the gap table drives every task in this plan.
+**Spec reference:** `docs/framework/framework-error-envelope-spec.md` §12 — the gap table drives every task in this plan.
 
 **Git policy:** Per standing user preference, **no automatic `git commit` steps**. The implementer must not run git commands. Each task ends with "report back for manual commit". The user decides commit scope.
 
@@ -937,13 +937,13 @@ Expected: 14/14 + 16/16 PASSED.
 ### Task 8: Update spec + commit prep
 
 **Files:**
-- Modify: `server-rs/docs/framework-error-envelope-spec.md`
+- Modify: `server-rs/docs/framework/framework-error-envelope-spec.md`
 
 Mark the §12 gap table items complete, update the status snapshot.
 
 - [ ] **Step 8.1: Update §12 gap table**
 
-Edit `server-rs/docs/framework-error-envelope-spec.md`. Find the §12 table. Add a new column "Status" and mark each row:
+Edit `server-rs/docs/framework/framework-error-envelope-spec.md`. Find the §12 table. Add a new column "Status" and mark each row:
 
 ```markdown
 | 规范条目 | 当前状态 | 需要改动 | Status |

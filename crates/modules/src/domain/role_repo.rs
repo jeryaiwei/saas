@@ -195,11 +195,11 @@ impl RoleRepo {
     /// - `sys_role(tenant_id, status, role_sort)` WHERE `del_flag = '0'` —
     ///   combined filter + sort (partial index, v1 TBD)
     ///
-    /// See `docs/framework-pagination-indexes.md` §2 for the global registry.
+    /// See `docs/framework/framework-pagination-indexes.md` §2 for the global registry.
     ///
     /// ## Consistency caveats
     /// Offset pagination is not snapshot-consistent. See
-    /// `docs/framework-pagination-spec.md` §8.1.
+    /// `docs/framework/framework-pagination-spec.md` §8.1.
     ///
     /// ## Performance expectation
     /// Role tables are small (typically < 1k rows per tenant); seq scan
@@ -501,7 +501,7 @@ impl RoleRepo {
     /// - `sys_user_tenant(user_id)` + `(tenant_id, status)` — JOIN + filter
     /// - `sys_user(create_at DESC) WHERE del_flag = '0'` — sort + soft delete
     ///
-    /// See `docs/framework-pagination-indexes.md` §3 for the registry.
+    /// See `docs/framework/framework-pagination-indexes.md` §3 for the registry.
     ///
     /// ## Consistency caveats
     /// Same Race A/B/C as generic offset pagination. See spec §8.1.
@@ -612,7 +612,7 @@ impl RoleRepo {
     /// Same as `find_allocated_users_page`; the LEFT JOIN anti-join still
     /// uses `sys_user_role(user_id, role_id)` (composite PK) effectively.
     ///
-    /// See `docs/framework-pagination-indexes.md` §4 for the registry.
+    /// See `docs/framework/framework-pagination-indexes.md` §4 for the registry.
     ///
     /// ## Consistency caveats
     /// Same Race A/B/C as generic offset pagination. See spec §8.1.

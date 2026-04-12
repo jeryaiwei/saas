@@ -71,7 +71,7 @@ impl ApiResponse<serde_json::Value> {
     /// Not for handler/service use — those paths return
     /// `Result<ApiResponse<T>, AppError>` and the error branch is
     /// serialized through this helper automatically. See
-    /// `docs/framework-error-envelope-spec.md` §2.2 for why this is
+    /// `docs/framework/framework-error-envelope-spec.md` §2.2 for why this is
     /// `pub(crate)` rather than public.
     ///
     /// `data` is `serde_json::Value` so the `Validation` variant can

@@ -10,7 +10,7 @@
 
 **Baseline assumption:** All v1.0 changes are already merged. Current test count is 153 passing. Run `cd server-rs && cargo test --workspace 2>&1 | grep "test result"` to confirm before starting. If baseline is different, stop and investigate.
 
-**Spec reference:** `docs/framework-pagination-spec.md` — read §6.2, §7.1, §8.2 for the v1.1 deferral notes.
+**Spec reference:** `docs/framework/framework-pagination-spec.md` — read §6.2, §7.1, §8.2 for the v1.1 deferral notes.
 
 **Git policy:** per standing user preference, no automatic `git commit` steps. The implementer (subagent or inline executor) **must not** run any git commands. The user will stage and commit manually at the end of each task or batch, using their own discretion about message and scope. Any step that previously said "commit" is now "verify the change compiles + tests pass, then hand back to the user for manual commit".
 
@@ -999,7 +999,7 @@ Create `server-rs/crates/framework/src/testing/mod.rs`:
 //! with zero runtime cost if unused, so they ship in the prod binary
 //! without concern.
 //!
-//! See `docs/framework-pagination-spec.md` §5 and `v1.1 Phase` for the
+//! See `docs/framework/framework-pagination-spec.md` §5 and `v1.1 Phase` for the
 //! intended usage of these helpers.
 
 pub mod explain_plan;
@@ -1233,7 +1233,7 @@ Create `server-rs/crates/framework/src/testing/pg_catalog.rs`:
 //! Postgres system catalog queries for integration tests.
 //!
 //! Primary use: assert that expected indexes listed in
-//! `docs/framework-pagination-indexes.md` actually exist in the DB
+//! `docs/framework/framework-pagination-indexes.md` actually exist in the DB
 //! after migrations have run. Called from integration tests — not a
 //! runtime check — so the async signature consumes an existing
 //! `sqlx::PgPool`.
@@ -1339,14 +1339,14 @@ Report back: `assert_index_exists` async helper implemented, framework compiles 
 ### Task 10: Documentation updates + spec v1.1 completion
 
 **Files:**
-- Modify: `server-rs/docs/framework-pagination-spec.md`
-- Modify: `server-rs/docs/framework-pagination-indexes.md`
+- Modify: `server-rs/docs/framework/framework-pagination-spec.md`
+- Modify: `server-rs/docs/framework/framework-pagination-indexes.md`
 
 Reflect v1.1 completion in the normative docs and indexes registry.
 
 - [ ] **Step 10.1: Update spec §11 table**
 
-Edit `server-rs/docs/framework-pagination-spec.md`. Find the "| **v1.1** |" row in §11 and update the "触发条件" column from "本周内立项" to "✅ 2026-04-11 已实施"; update the "预估成本" column footer with actual LOC delta (filled in after Task 10.3 below).
+Edit `server-rs/docs/framework/framework-pagination-spec.md`. Find the "| **v1.1** |" row in §11 and update the "触发条件" column from "本周内立项" to "✅ 2026-04-11 已实施"; update the "预估成本" column footer with actual LOC delta (filled in after Task 10.3 below).
 
 - [ ] **Step 10.2: Update spec §6.2 and §7.1 "v1.1 引入" notes**
 
@@ -1364,12 +1364,12 @@ Add new v1.1 checklist items at the end of §13:
 - [ ] `find_page` 的 rows/count 查询都用 `with_timeout` 包裹
 - [ ] `find_page` 收尾有 `reconcile_total` 修复 Race B
 - [ ] `find_page` 的 post-condition 违反时走 truncate + warn，不 panic
-- [ ] 如涉及新索引假设，已在 `docs/framework-pagination-indexes.md` 登记并有对应 migration
+- [ ] 如涉及新索引假设，已在 `docs/framework/framework-pagination-indexes.md` 登记并有对应 migration
 ```
 
 - [ ] **Step 10.5: Update indexes doc todo section**
 
-Edit `server-rs/docs/framework-pagination-indexes.md`. Find the "待办事项" section and mark the seq-scan helper item complete:
+Edit `server-rs/docs/framework/framework-pagination-indexes.md`. Find the "待办事项" section and mark the seq-scan helper item complete:
 
 ```markdown
 ## 待办事项
@@ -1469,7 +1469,7 @@ After all 10 tasks:
 
 Per spec §11 触发器表 + v1.1 scope decisions:
 
-1. **Write the actual index migrations** — the helper (`assert_index_exists`) exists, but `docs/framework-pagination-indexes.md` "待办事项" still lists TBD indexes. Creating them requires real `EXPLAIN ANALYZE` on seeded data — defer to v1.2 when seed data arrives.
+1. **Write the actual index migrations** — the helper (`assert_index_exists`) exists, but `docs/framework/framework-pagination-indexes.md` "待办事项" still lists TBD indexes. Creating them requires real `EXPLAIN ANALYZE` on seeded data — defer to v1.2 when seed data arrives.
 2. **Wire seq-scan regression tests to specific `find_page` queries** — the helper exists, but on the current 100-row dev DB Postgres picks seq scan over index scan regardless (index scan is more expensive for tiny tables). Enabling these tests requires `SET enable_seqscan = off` + a non-trivial seed; defer to v1.2.
 3. **`total: Option<u64>` + `has_more` mode** — v2.0 per spec §11.
 4. **Cursor pagination** — v3.0.

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Bring the observability primitive into compliance with `docs/framework-observability-spec.md` v1.0 — by making `tenant_http` middleware open a root `http_request` span that inherits `request_id` / `method` / `path` (and gets `user_id` / `user_name` / `tenant_id` / `status` filled in by downstream middleware), then removing the 4 manual `Span::current().record("tenant_id", ...)` hacks in pagination v1.1, and filling out event-level + middleware instrument gaps identified in spec §12.
+**Goal:** Bring the observability primitive into compliance with `docs/framework/framework-observability-spec.md` v1.0 — by making `tenant_http` middleware open a root `http_request` span that inherits `request_id` / `method` / `path` (and gets `user_id` / `user_name` / `tenant_id` / `status` filled in by downstream middleware), then removing the 4 manual `Span::current().record("tenant_id", ...)` hacks in pagination v1.1, and filling out event-level + middleware instrument gaps identified in spec §12.
 
 **Architecture:** The framework currently has `RequestContext` (task-local state) completely disconnected from tracing spans. `request_id` exists in the wire response but never appears in any log line, making client-reported bug reports untraceable. v1.0 closes this gap by having `tenant_http` create a root `info_span!("http_request", ...)` with `field::Empty` placeholders for `tenant_id` / `user_id` / `user_name` / `status`, then `.instrument(span)` over `next.run(req)`. `auth` middleware records user fields onto the current (root) span after session loads. Downstream `#[tracing::instrument]` spans inherit these fields automatically via tracing's span stack. The 4 pagination v1.1 manual `Span::current().record("tenant_id", ...)` hacks become obsolete and are removed. Middleware + infra layers that had zero `#[instrument]` coverage (`auth`, `tenant_guard`, `access::enforce`, `bcrypt::hash_password`) get a minimal `#[instrument(skip_all, name = "...")]` each so traces show the real cost breakdown of auth-heavy requests.
 
@@ -15,7 +15,7 @@
 
 Current test count is **179 passing**. Run `cd server-rs && cargo test --workspace 2>&1 | grep "test result:"` to confirm. If baseline differs, stop and investigate.
 
-**Spec reference:** `docs/framework-observability-spec.md` §5 (root span implementation contract) and §12 (gap table) are the primary drivers.
+**Spec reference:** `docs/framework/framework-observability-spec.md` §5 (root span implementation contract) and §12 (gap table) are the primary drivers.
 
 **Git policy:** Per standing user preference, **no automatic `git commit` steps**. The implementer must not run git commands. Each task ends with "report back for manual commit".
 
@@ -661,11 +661,11 @@ Report: typo fix applied, login success info event emitted and observed in smoke
 ### Task 8: Update spec gap table
 
 **Files:**
-- Modify: `server-rs/docs/framework-observability-spec.md`
+- Modify: `server-rs/docs/framework/framework-observability-spec.md`
 
 - [ ] **Step 8.1: Update §12 gap table**
 
-Edit `server-rs/docs/framework-observability-spec.md` §12. Change each row's status:
+Edit `server-rs/docs/framework/framework-observability-spec.md` §12. Change each row's status:
 
 | 规范条目 | 之前状态 | 落地任务 | 新状态 |
 |---|---|---|---|
@@ -690,7 +690,7 @@ Find the "v1.0 必做" / "v1.0 次做" sections below the table and replace them
 
 - [ ] **Step 8.2: Cross-reference update in pagination spec**
 
-Edit `server-rs/docs/framework-pagination-spec.md` §6.1 (the observability standard fields section). The observability contract now mandates that `tenant_id` comes from the root span — pagination spec's `find_page` `#[instrument]` no longer needs to declare it. Find the text that says to declare 5 standard fields and update it so it says 4 (`tenant_id` moved to root span responsibility).
+Edit `server-rs/docs/framework/framework-pagination-spec.md` §6.1 (the observability standard fields section). The observability contract now mandates that `tenant_id` comes from the root span — pagination spec's `find_page` `#[instrument]` no longer needs to declare it. Find the text that says to declare 5 standard fields and update it so it says 4 (`tenant_id` moved to root span responsibility).
 
 Locate the "标准字段（每个 `find_page` 必须发出）" table. Change the `tenant_id` row's "来源" from `current_tenant_scope()` to `"root span (auto-inherited from tenant_http + auth middleware)"` and add a footnote: `**不得** 在 find_page 的 instrument 上重复声明该字段 (obs spec §2.3)`.
 

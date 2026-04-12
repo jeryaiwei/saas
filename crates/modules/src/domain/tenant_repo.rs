@@ -207,7 +207,7 @@ impl TenantRepo {
     ///
     /// ## Consistency caveats
     /// Offset pagination is not snapshot-consistent. See
-    /// `docs/framework-pagination-spec.md` §8.1.
+    /// `docs/framework/framework-pagination-spec.md` §8.1.
     #[instrument(skip_all, fields(
         has_tenant_id = filter.tenant_id.is_some(),
         has_company_name = filter.company_name.is_some(),

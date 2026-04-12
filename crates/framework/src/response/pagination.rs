@@ -1,7 +1,7 @@
 //! Paginated list payload. Field names match NestJS `Result.page(...)`:
 //! `{ rows, total, pageNum, pageSize, pages }`.
 //!
-//! See `docs/framework-pagination-spec.md` for the normative contract
+//! See `docs/framework/framework-pagination-spec.md` for the normative contract
 //! governing all list endpoints.
 
 use serde::{Deserialize, Serialize};
@@ -33,7 +33,7 @@ pub const QUERY_TIMEOUT_SECS: u64 = 5;
 /// Threshold above which a paginated query (`rows_ms + count_ms`)
 /// emits a `tracing::warn!` — signals to operators that the query is
 /// drifting toward timeout territory even though it still returns in
-/// time. See `docs/framework-pagination-spec.md` §6.2.
+/// time. See `docs/framework/framework-pagination-spec.md` §6.2.
 pub const SLOW_QUERY_WARN_MS: u128 = 300;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -238,7 +238,7 @@ impl PaginationParams {
     ///
     /// Static helper: takes raw values so it can be unit-tested without
     /// materializing a `PaginationParams` instance. See
-    /// `docs/framework-pagination-spec.md` §8.2.
+    /// `docs/framework/framework-pagination-spec.md` §8.2.
     pub fn reconcile_total(observed_total: i64, rows_len: usize, offset: i64) -> i64 {
         let lower_bound = offset.saturating_add(rows_len as i64);
         observed_total.max(lower_bound)

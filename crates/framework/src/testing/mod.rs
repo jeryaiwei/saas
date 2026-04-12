@@ -5,7 +5,7 @@
 //! here are pure functions with zero runtime cost if unused, so they
 //! ship in the prod binary without concern.
 //!
-//! See `docs/framework-pagination-spec.md` §5 and v1.1 Phase for the
+//! See `docs/framework/framework-pagination-spec.md` §5 and v1.1 Phase for the
 //! intended usage.
 
 pub mod explain_plan;

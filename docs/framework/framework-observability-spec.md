@@ -10,8 +10,8 @@
 >
 > **关联规范**：
 >
-> - `docs/framework-pagination-spec.md` — pagination 观察性字段是本规范的一个专用子集
-> - `docs/framework-error-envelope-spec.md` — error tracing 要求是本规范 §6 的补充
+> - `docs/framework/framework-pagination-spec.md` — pagination 观察性字段是本规范的一个专用子集
+> - `docs/framework/framework-error-envelope-spec.md` — error tracing 要求是本规范 §6 的补充
 
 ---
 

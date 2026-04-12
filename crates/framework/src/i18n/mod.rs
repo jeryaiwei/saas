@@ -59,8 +59,8 @@ pub fn get_by_key(key: &str, lang: &str) -> Option<String> {
 /// `AppError::Validation → IntoResponse` path to surface the actual
 /// min/max bounds to the client instead of generic "out of range".
 ///
-/// See `docs/framework-pagination-spec.md` §7.1 (v1.1) and
-/// `docs/framework-error-envelope-spec.md` §5.2.
+/// See `docs/framework/framework-pagination-spec.md` §7.1 (v1.1) and
+/// `docs/framework/framework-error-envelope-spec.md` §5.2.
 pub fn get_by_key_with_json_params(
     key: &str,
     lang: &str,
@@ -211,7 +211,7 @@ mod tests {
         // Explicit list of every ResponseCode constant defined in
         // `framework/src/response/codes.rs`. When adding a new const,
         // YOU MUST add it here AND add matching entries to both i18n
-        // JSON files. See `docs/framework-error-envelope-spec.md` §5.3.
+        // JSON files. See `docs/framework/framework-error-envelope-spec.md` §5.3.
         let codes: &[ResponseCode] = &[
             // HTTP-aligned
             ResponseCode::SUCCESS,

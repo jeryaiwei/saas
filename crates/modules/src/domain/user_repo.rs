@@ -175,12 +175,12 @@ impl UserRepo {
     /// - `sys_user_tenant(tenant_id, status)` — tenant filter
     /// - `sys_user(create_at DESC) WHERE del_flag = '0'` — sort + soft delete
     ///
-    /// See `docs/framework-pagination-indexes.md` §1 for the global registry.
+    /// See `docs/framework/framework-pagination-indexes.md` §1 for the global registry.
     ///
     /// ## Consistency caveats
     /// Offset pagination is not snapshot-consistent. Concurrent insert/delete
     /// between page-N and page-(N+1) fetches may cause duplicate or missing
-    /// rows. See `docs/framework-pagination-spec.md` §8.1 (Race A/B/C).
+    /// rows. See `docs/framework/framework-pagination-spec.md` §8.1 (Race A/B/C).
     ///
     /// ## Performance expectation
     /// - Shallow (offset < 1000): < 10ms on 10k-user tenant

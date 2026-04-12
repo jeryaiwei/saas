@@ -49,7 +49,7 @@ pub struct FieldError {
     /// `value`). Framework-internal — never serialized to wire.
     /// `AppError::IntoResponse` uses this map to substitute `{min}` /
     /// `{max}` placeholders in the translated i18n message. See
-    /// `docs/framework-error-envelope-spec.md` §7.1 (v1.1).
+    /// `docs/framework/framework-error-envelope-spec.md` §7.1 (v1.1).
     #[serde(skip)]
     pub params: std::collections::HashMap<String, serde_json::Value>,
 }

@@ -1,7 +1,7 @@
 # SaaS 分页索引契约
 
 **状态**：v1.0（2026-04-11 首次发布）
-**关联规范**：`docs/framework-pagination-spec.md` §5
+**关联规范**：`docs/framework/framework-pagination-spec.md` §5
 
 > 本文档是**全局真源**：每个 `find_page` 方法依赖的索引必须在此登记。新增 list 端点时必须同步更新本文档，否则 PR 不得合并（见 spec §13 checklist）。
 

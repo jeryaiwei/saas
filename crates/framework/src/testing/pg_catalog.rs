@@ -1,7 +1,7 @@
 //! Postgres system catalog queries for integration tests.
 //!
 //! Primary use: assert that expected indexes listed in
-//! `docs/framework-pagination-indexes.md` actually exist in the DB
+//! `docs/framework/framework-pagination-indexes.md` actually exist in the DB
 //! after migrations have run. Called from integration tests — not a
 //! runtime check — so the async signature consumes an existing
 //! `sqlx::PgPool`.

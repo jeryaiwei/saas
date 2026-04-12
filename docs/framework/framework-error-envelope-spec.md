@@ -8,7 +8,7 @@
 >
 > **适用对象**：所有编写 handler / service / repo / 自定义 error 路径 / 自定义 validator 的开发者、reviewer、以及框架本身的维护者。
 >
-> **关联规范**：`docs/framework-pagination-spec.md` — 分页包络契约是本规范的一个专用子集。
+> **关联规范**：`docs/framework/framework-pagination-spec.md` — 分页包络契约是本规范的一个专用子集。
 
 ---
 
@@ -25,7 +25,7 @@
 
 **规范不覆盖**：
 
-- 分页响应的数据结构（见 `docs/framework-pagination-spec.md`）
+- 分页响应的数据结构（见 `docs/framework/framework-pagination-spec.md`）
 - Cursor 分页（v3.0，独立 primitive）
 - 流式响应 / SSE / WebSocket（独立 primitive）
 - 文件下载、二进制响应（独立 primitive）
