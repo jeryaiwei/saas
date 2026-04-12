@@ -265,22 +265,14 @@ pub async fn change_status(state: &AppState, dto: ChangeUserStatusDto) -> Result
 
 /// Soft-delete one or more users. NestJS accepts a comma-separated list
 /// in the path segment (`DELETE /system/user/id1,id2,id3`). We split,
-/// pre-validate ALL targets (guards + existence), then process the
-/// writes. Validation loops run first so partial success is impossible
-/// — either every id in the batch is valid and all are deleted, or the
-/// batch aborts before any write happens.
+/// pre-validate ALL targets (guards + existence), then apply deletes
+/// inside a transaction so partial success is impossible — either every
+/// id is deleted or the entire batch rolls back.
 ///
 /// Guards apply per-target:
 /// - cannot delete self
 /// - cannot delete super admin
 /// - must exist in the current tenant (returns `DATA_NOT_FOUND` otherwise)
-///
-/// Tiny TOCTOU window: a concurrent delete between the existence check
-/// and the write could cause a write to affect 0 rows. In that case we
-/// still surface `DATA_NOT_FOUND`, but any earlier id in the batch is
-/// already committed — the race is narrow and admin-only, acceptable
-/// for Phase 1. A proper fix (wrap the write loop in a transaction)
-/// is tracked for Phase 2.
 #[tracing::instrument(skip_all, fields(path_ids = %path_ids))]
 pub async fn remove(state: &AppState, path_ids: &str) -> Result<(), AppError> {
     let ids: Vec<&str> = path_ids.split(',').filter(|s| !s.is_empty()).collect();
@@ -289,7 +281,6 @@ pub async fn remove(state: &AppState, path_ids: &str) -> Result<(), AppError> {
     }
 
     // Pre-validate guards + existence for ALL ids before any write.
-    // Two loops so the whole batch fails fast on the first violation.
     for id in &ids {
         if is_self_op(id) {
             return Err(AppError::business(ResponseCode::OPERATION_NOT_ALLOWED));
@@ -303,15 +294,25 @@ pub async fn remove(state: &AppState, path_ids: &str) -> Result<(), AppError> {
             .or_business(ResponseCode::DATA_NOT_FOUND)?;
     }
 
-    // Apply deletes. A post-check race (concurrent delete after the
-    // existence check but before the write) would surface as 0 affected
-    // rows → DATA_NOT_FOUND — documented above.
+    // Apply deletes inside a transaction — all succeed or all roll back.
+    let mut tx = state
+        .pg
+        .begin()
+        .await
+        .context("remove: begin tx")
+        .into_internal()?;
+
     for id in &ids {
-        let affected = UserRepo::soft_delete_by_id(&state.pg, id)
+        let affected = UserRepo::soft_delete_by_id(&mut *tx, id)
             .await
             .into_internal()?;
         (affected == 0).business_err_if(ResponseCode::DATA_NOT_FOUND)?;
     }
+
+    tx.commit()
+        .await
+        .context("remove: commit tx")
+        .into_internal()?;
 
     Ok(())
 }

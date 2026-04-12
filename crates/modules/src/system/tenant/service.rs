@@ -300,6 +300,8 @@ pub async fn update(state: &AppState, dto: UpdateTenantDto) -> Result<(), AppErr
 }
 
 /// Soft-delete one or more tenants. Accepts a comma-separated id list.
+/// Pre-validates all targets, then applies the batch delete inside a
+/// transaction so partial success is impossible.
 ///
 /// Guards:
 /// - cannot delete the protected super-tenant
@@ -338,9 +340,21 @@ pub async fn remove(state: &AppState, path_ids: &str) -> Result<(), AppError> {
         return Err(AppError::business(ResponseCode::TENANT_HAS_CHILDREN));
     }
 
-    // Batch soft-delete by surrogate id
-    TenantRepo::soft_delete_by_ids(&state.pg, &ids)
+    // Batch soft-delete inside a transaction
+    let mut tx = state
+        .pg
+        .begin()
         .await
+        .context("remove: begin tx")
+        .into_internal()?;
+
+    TenantRepo::soft_delete_by_ids(&mut *tx, &ids)
+        .await
+        .into_internal()?;
+
+    tx.commit()
+        .await
+        .context("remove: commit tx")
         .into_internal()?;
 
     Ok(())
