@@ -153,7 +153,7 @@ impl TenantRepo {
     /// Returns `None` if not found or soft-deleted.
     #[instrument(skip_all, fields(id = %id))]
     pub async fn find_by_id(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         id: &str,
     ) -> anyhow::Result<Option<TenantWithPackageName>> {
         let sql = format!(
@@ -166,7 +166,7 @@ impl TenantRepo {
         );
         let row = sqlx::query_as::<_, TenantWithPackageName>(&sql)
             .bind(id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_id: select sys_tenant")?;
         Ok(row)
@@ -177,7 +177,7 @@ impl TenantRepo {
     /// not found or soft-deleted.
     #[instrument(skip_all, fields(tenant_id = %tenant_id))]
     pub async fn find_by_tenant_id(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         tenant_id: &str,
     ) -> anyhow::Result<Option<SysTenant>> {
         let sql = format!(
@@ -192,7 +192,7 @@ impl TenantRepo {
         // need an aliased FROM — the `t` alias is already present in the FROM clause.
         let row = sqlx::query_as::<_, SysTenant>(&sql)
             .bind(tenant_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_tenant_id: select sys_tenant")?;
         Ok(row)
@@ -308,7 +308,7 @@ impl TenantRepo {
     /// to reliably pick the first admin registered per tenant.
     #[instrument(skip_all, fields(tenant_count = tenant_ids.len()))]
     pub async fn find_admin_user_names(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         tenant_ids: &[String],
     ) -> anyhow::Result<HashMap<String, String>> {
         if tenant_ids.is_empty() {
@@ -325,7 +325,7 @@ impl TenantRepo {
               ORDER BY ut.tenant_id, ut.create_at ASC",
         )
         .bind(tenant_ids)
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await
         .context("find_admin_user_names: select sys_user_tenant")?;
 
@@ -339,7 +339,7 @@ impl TenantRepo {
     /// Returns the earliest-registered admin (`is_admin='1'`, `status='0'`).
     #[instrument(skip_all, fields(tenant_id = %tenant_id))]
     pub async fn find_admin_user_info(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         tenant_id: &str,
     ) -> anyhow::Result<Option<AdminUserInfo>> {
         let row = sqlx::query_as::<_, AdminUserInfo>(
@@ -356,7 +356,7 @@ impl TenantRepo {
               LIMIT 1",
         )
         .bind(tenant_id)
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await
         .context("find_admin_user_info: select sys_user_tenant")?;
         Ok(row)
@@ -367,7 +367,7 @@ impl TenantRepo {
     /// tenants that still have children.
     #[instrument(skip_all, fields(tenant_count = tenant_ids.len()))]
     pub async fn find_tenant_ids_with_children(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         tenant_ids: &[String],
     ) -> anyhow::Result<Vec<String>> {
         if tenant_ids.is_empty() {
@@ -380,7 +380,7 @@ impl TenantRepo {
                 AND del_flag = '0'",
         )
         .bind(tenant_ids)
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await
         .context("find_tenant_ids_with_children: select sys_tenant")?;
         Ok(rows.into_iter().map(|(id,)| id).collect())
@@ -391,7 +391,7 @@ impl TenantRepo {
     /// during update uniqueness checks.
     #[instrument(skip_all, fields(name = %name))]
     pub async fn exists_by_company_name_prefix(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         name: &str,
         exclude_tenant_id: Option<&str>,
     ) -> anyhow::Result<bool> {
@@ -403,7 +403,7 @@ impl TenantRepo {
         )
         .bind(name)
         .bind(exclude_tenant_id)
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
         .context("exists_by_company_name_prefix: count sys_tenant")?;
         Ok(count > 0)
@@ -413,9 +413,11 @@ impl TenantRepo {
     /// The caller uses this to construct a zero-padded `tenant_id` string
     /// (e.g. `format!("{:06}", next_val)` → `"000042"`).
     #[instrument(skip_all)]
-    pub async fn generate_next_tenant_id(pool: &PgPool) -> anyhow::Result<i64> {
+    pub async fn generate_next_tenant_id(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> anyhow::Result<i64> {
         let next_val: i64 = sqlx::query_scalar("SELECT nextval('tenant_id_seq') AS next_val")
-            .fetch_one(pool)
+            .fetch_one(executor)
             .await
             .context("generate_next_tenant_id: nextval")?;
         Ok(next_val)
@@ -486,7 +488,10 @@ impl TenantRepo {
     /// use COALESCE so callers can pass `None` to leave them unchanged.
     /// Returns `rows_affected` — 0 means "not found or already deleted".
     #[instrument(skip_all, fields(id = %params.id))]
-    pub async fn update_by_id(pool: &PgPool, params: TenantUpdateParams) -> anyhow::Result<u64> {
+    pub async fn update_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: TenantUpdateParams,
+    ) -> anyhow::Result<u64> {
         let updater = audit_update_by();
 
         let affected = sqlx::query(
@@ -522,7 +527,7 @@ impl TenantRepo {
         .bind(params.remark.as_deref())
         .bind(&updater)
         .bind(&params.id)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("update_by_id: update sys_tenant")?
         .rows_affected();
@@ -534,7 +539,10 @@ impl TenantRepo {
     /// Idempotent — already-deleted rows are silently skipped.
     /// Returns `rows_affected` (number of rows actually updated).
     #[instrument(skip_all, fields(id_count = ids.len()))]
-    pub async fn soft_delete_by_ids(pool: &PgPool, ids: &[String]) -> anyhow::Result<u64> {
+    pub async fn soft_delete_by_ids(
+        executor: impl sqlx::PgExecutor<'_>,
+        ids: &[String],
+    ) -> anyhow::Result<u64> {
         if ids.is_empty() {
             return Ok(0);
         }
@@ -548,7 +556,7 @@ impl TenantRepo {
         )
         .bind(&updater)
         .bind(ids)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("soft_delete_by_ids: update sys_tenant")?
         .rows_affected();

@@ -8,7 +8,6 @@
 use super::entities::SysDept;
 use anyhow::Context;
 use framework::context::{audit_update_by, current_tenant_scope, AuditInsert};
-use sqlx::PgPool;
 use tracing::instrument;
 
 /// Single source of truth for `SELECT` column lists.
@@ -60,7 +59,10 @@ pub struct DeptRepo;
 impl DeptRepo {
     /// Find a single dept by `dept_id`, tenant-scoped, soft-delete filtered.
     #[instrument(skip_all, fields(dept_id = %dept_id))]
-    pub async fn find_by_id(pool: &PgPool, dept_id: &str) -> anyhow::Result<Option<SysDept>> {
+    pub async fn find_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        dept_id: &str,
+    ) -> anyhow::Result<Option<SysDept>> {
         let tenant = current_tenant_scope();
         let sql = format!(
             "SELECT {DEPT_COLUMNS} \
@@ -73,7 +75,7 @@ impl DeptRepo {
         let row = sqlx::query_as::<_, SysDept>(&sql)
             .bind(dept_id)
             .bind(tenant.as_deref())
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_id: select sys_dept")?;
         Ok(row)
@@ -85,7 +87,10 @@ impl DeptRepo {
         has_name = filter.dept_name.is_some(),
         has_status = filter.status.is_some(),
     ))]
-    pub async fn find_list(pool: &PgPool, filter: DeptListFilter) -> anyhow::Result<Vec<SysDept>> {
+    pub async fn find_list(
+        executor: impl sqlx::PgExecutor<'_>,
+        filter: DeptListFilter,
+    ) -> anyhow::Result<Vec<SysDept>> {
         let tenant = current_tenant_scope();
         let sql = format!(
             "SELECT {DEPT_COLUMNS} FROM sys_dept \
@@ -99,7 +104,7 @@ impl DeptRepo {
             .bind(tenant.as_deref())
             .bind(filter.dept_name.as_deref())
             .bind(filter.status.as_deref())
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_list: select sys_dept")?;
         Ok(rows)
@@ -107,7 +112,9 @@ impl DeptRepo {
 
     /// Active-only option list for dropdowns. Tenant-scoped, hard cap 500.
     #[instrument(skip_all)]
-    pub async fn find_option_list(pool: &PgPool) -> anyhow::Result<Vec<SysDept>> {
+    pub async fn find_option_list(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> anyhow::Result<Vec<SysDept>> {
         let tenant = current_tenant_scope();
         let sql = format!(
             "SELECT {DEPT_COLUMNS} FROM sys_dept \
@@ -117,7 +124,7 @@ impl DeptRepo {
         );
         let rows = sqlx::query_as::<_, SysDept>(&sql)
             .bind(tenant.as_deref())
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_option_list: select sys_dept")?;
         Ok(rows)
@@ -127,7 +134,7 @@ impl DeptRepo {
     /// Excludes rows where `exclude_dept_id` appears in the `ancestors` array.
     #[instrument(skip_all, fields(exclude_dept_id = %exclude_dept_id))]
     pub async fn find_excluding(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         exclude_dept_id: &str,
     ) -> anyhow::Result<Vec<SysDept>> {
         let tenant = current_tenant_scope();
@@ -142,7 +149,7 @@ impl DeptRepo {
         let rows = sqlx::query_as::<_, SysDept>(&sql)
             .bind(tenant.as_deref())
             .bind(exclude_dept_id)
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_excluding: select sys_dept")?;
         Ok(rows)
@@ -152,7 +159,7 @@ impl DeptRepo {
     /// Returns `None` if the parent does not exist (caller maps to 7014).
     #[instrument(skip_all, fields(parent_id = %parent_id))]
     pub async fn find_parent_ancestors(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         parent_id: &str,
     ) -> anyhow::Result<Option<Vec<String>>> {
         let tenant = current_tenant_scope();
@@ -164,7 +171,7 @@ impl DeptRepo {
         )
         .bind(parent_id)
         .bind(tenant.as_deref())
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await
         .context("find_parent_ancestors: select sys_dept")?;
         Ok(row.map(|(a,)| a))
@@ -173,7 +180,10 @@ impl DeptRepo {
     /// Insert a new dept. Audit fields are stamped from `AuditInsert::now()`.
     /// Returns the newly-inserted row.
     #[instrument(skip_all, fields(dept_name = %params.dept_name))]
-    pub async fn insert(pool: &PgPool, params: DeptInsertParams) -> anyhow::Result<SysDept> {
+    pub async fn insert(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: DeptInsertParams,
+    ) -> anyhow::Result<SysDept> {
         let audit = AuditInsert::now();
         let dept_id = uuid::Uuid::new_v4().to_string();
 
@@ -201,7 +211,7 @@ impl DeptRepo {
             .bind(&audit.create_by)
             .bind(&audit.update_by)
             .bind(params.remark.as_deref())
-            .fetch_one(pool)
+            .fetch_one(executor)
             .await
             .context("insert: insert sys_dept")?;
         Ok(row)
@@ -212,7 +222,10 @@ impl DeptRepo {
     /// Audit `update_by` / `update_at` are always stamped.
     /// Returns `rows_affected` — 0 means "not found".
     #[instrument(skip_all, fields(dept_id = %params.dept_id))]
-    pub async fn update_by_id(pool: &PgPool, params: DeptUpdateParams) -> anyhow::Result<u64> {
+    pub async fn update_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: DeptUpdateParams,
+    ) -> anyhow::Result<u64> {
         let tenant = current_tenant_scope();
         let updater = audit_update_by();
 
@@ -245,7 +258,7 @@ impl DeptRepo {
         .bind(&updater)
         .bind(&params.dept_id)
         .bind(tenant.as_deref())
-        .execute(pool)
+        .execute(executor)
         .await
         .context("update_by_id: update sys_dept")?
         .rows_affected();
@@ -255,7 +268,10 @@ impl DeptRepo {
 
     /// Soft-delete a dept (`del_flag = '1'`). Tenant-scoped.
     #[instrument(skip_all, fields(dept_id = %dept_id))]
-    pub async fn soft_delete(pool: &PgPool, dept_id: &str) -> anyhow::Result<u64> {
+    pub async fn soft_delete(
+        executor: impl sqlx::PgExecutor<'_>,
+        dept_id: &str,
+    ) -> anyhow::Result<u64> {
         let tenant = current_tenant_scope();
         let updater = audit_update_by();
 
@@ -269,7 +285,7 @@ impl DeptRepo {
         .bind(&updater)
         .bind(dept_id)
         .bind(tenant.as_deref())
-        .execute(pool)
+        .execute(executor)
         .await
         .context("soft_delete: update sys_dept")?
         .rows_affected();

@@ -8,7 +8,6 @@
 use super::entities::SysMenu;
 use anyhow::Context;
 use framework::context::{audit_update_by, AuditInsert};
-use sqlx::PgPool;
 use tracing::instrument;
 
 /// Single source of truth for `SELECT` column lists.
@@ -89,7 +88,10 @@ pub struct MenuRepo;
 impl MenuRepo {
     /// Find a single menu by `menu_id`, soft-delete filtered.
     #[instrument(skip_all, fields(menu_id = %menu_id))]
-    pub async fn find_by_id(pool: &PgPool, menu_id: &str) -> anyhow::Result<Option<SysMenu>> {
+    pub async fn find_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        menu_id: &str,
+    ) -> anyhow::Result<Option<SysMenu>> {
         let sql = format!(
             "SELECT {MENU_COLUMNS} \
                FROM sys_menu \
@@ -99,7 +101,7 @@ impl MenuRepo {
         );
         let row = sqlx::query_as::<_, SysMenu>(&sql)
             .bind(menu_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_id: select sys_menu")?;
         Ok(row)
@@ -112,7 +114,10 @@ impl MenuRepo {
         has_parent = filter.parent_id.is_some(),
         has_type = filter.menu_type.is_some(),
     ))]
-    pub async fn find_list(pool: &PgPool, filter: MenuListFilter) -> anyhow::Result<Vec<SysMenu>> {
+    pub async fn find_list(
+        executor: impl sqlx::PgExecutor<'_>,
+        filter: MenuListFilter,
+    ) -> anyhow::Result<Vec<SysMenu>> {
         let sql = format!(
             "SELECT {MENU_COLUMNS} FROM sys_menu \
               WHERE del_flag = '0' \
@@ -127,7 +132,7 @@ impl MenuRepo {
             .bind(filter.status.as_deref())
             .bind(filter.parent_id.as_deref())
             .bind(filter.menu_type.as_deref())
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_list: select sys_menu")?;
         Ok(rows)
@@ -135,14 +140,16 @@ impl MenuRepo {
 
     /// Return minimal tree node rows for building menu tree structures.
     #[instrument(skip_all)]
-    pub async fn find_tree_nodes(pool: &PgPool) -> anyhow::Result<Vec<MenuTreeRow>> {
+    pub async fn find_tree_nodes(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> anyhow::Result<Vec<MenuTreeRow>> {
         let rows = sqlx::query_as::<_, MenuTreeRow>(
             "SELECT menu_id, menu_name, parent_id \
                FROM sys_menu \
               WHERE del_flag = '0' \
               ORDER BY parent_id ASC, order_num ASC",
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await
         .context("find_tree_nodes: select sys_menu")?;
         Ok(rows)
@@ -152,7 +159,7 @@ impl MenuRepo {
     /// Returns all menus, marking those bound to `role_id` in `tenant_id`.
     #[instrument(skip_all, fields(role_id = %role_id, tenant_id = %tenant_id))]
     pub async fn find_role_menu_tree_for_admin(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         role_id: &str,
         tenant_id: &str,
     ) -> anyhow::Result<Vec<RoleMenuTreeRow>> {
@@ -171,7 +178,7 @@ impl MenuRepo {
         )
         .bind(role_id)
         .bind(tenant_id)
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await
         .context("find_role_menu_tree_for_admin: select sys_menu")?;
         Ok(rows)
@@ -181,7 +188,7 @@ impl MenuRepo {
     /// Filters menus to those allowed by the tenant's package.
     #[instrument(skip_all, fields(role_id = %role_id, tenant_id = %tenant_id))]
     pub async fn find_role_menu_tree_for_tenant(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         role_id: &str,
         tenant_id: &str,
     ) -> anyhow::Result<Vec<RoleMenuTreeRow>> {
@@ -204,7 +211,7 @@ impl MenuRepo {
         )
         .bind(role_id)
         .bind(tenant_id)
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await
         .context("find_role_menu_tree_for_tenant: select sys_menu")?;
         Ok(rows)
@@ -213,7 +220,7 @@ impl MenuRepo {
     /// Return the `menu_ids` array for a tenant package.
     #[instrument(skip_all, fields(package_id = %package_id))]
     pub async fn find_package_menu_ids(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         package_id: &str,
     ) -> anyhow::Result<Option<Vec<String>>> {
         let row: Option<Vec<String>> = sqlx::query_scalar(
@@ -223,7 +230,7 @@ impl MenuRepo {
                 AND status = '0'",
         )
         .bind(package_id)
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await
         .context("find_package_menu_ids: select sys_tenant_package")?;
         Ok(row)
@@ -232,7 +239,10 @@ impl MenuRepo {
     /// Insert a new menu. Audit fields are stamped from `AuditInsert::now()`.
     /// Returns the newly-inserted row.
     #[instrument(skip_all, fields(menu_name = %params.menu_name))]
-    pub async fn insert(pool: &PgPool, params: MenuInsertParams) -> anyhow::Result<SysMenu> {
+    pub async fn insert(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: MenuInsertParams,
+    ) -> anyhow::Result<SysMenu> {
         let audit = AuditInsert::now();
         let menu_id = uuid::Uuid::new_v4().to_string();
 
@@ -264,7 +274,7 @@ impl MenuRepo {
             .bind(&audit.create_by)
             .bind(&audit.update_by)
             .bind(params.remark.as_deref())
-            .fetch_one(pool)
+            .fetch_one(executor)
             .await
             .context("insert: insert sys_menu")?;
         Ok(row)
@@ -274,7 +284,10 @@ impl MenuRepo {
     /// `rows_affected` — 0 means "not found". Audit `update_by` / `update_at`
     /// are always stamped.
     #[instrument(skip_all, fields(menu_id = %params.menu_id))]
-    pub async fn update_by_id(pool: &PgPool, params: MenuUpdateParams) -> anyhow::Result<u64> {
+    pub async fn update_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: MenuUpdateParams,
+    ) -> anyhow::Result<u64> {
         let updater = audit_update_by();
 
         let affected = sqlx::query(
@@ -314,7 +327,7 @@ impl MenuRepo {
         .bind(params.remark.as_deref())
         .bind(&updater)
         .bind(&params.menu_id)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("update_by_id: update sys_menu")?
         .rows_affected();
@@ -324,7 +337,10 @@ impl MenuRepo {
 
     /// Soft-delete a single menu (`del_flag = '1'`). Idempotent.
     #[instrument(skip_all, fields(menu_id = %menu_id))]
-    pub async fn soft_delete(pool: &PgPool, menu_id: &str) -> anyhow::Result<u64> {
+    pub async fn soft_delete(
+        executor: impl sqlx::PgExecutor<'_>,
+        menu_id: &str,
+    ) -> anyhow::Result<u64> {
         let updater = audit_update_by();
 
         let affected = sqlx::query(
@@ -335,7 +351,7 @@ impl MenuRepo {
         )
         .bind(&updater)
         .bind(menu_id)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("soft_delete: update sys_menu")?
         .rows_affected();
@@ -346,7 +362,10 @@ impl MenuRepo {
     /// Soft-delete a menu and all its descendants using a recursive CTE.
     /// Returns the total number of rows affected.
     #[instrument(skip_all, fields(id_count = menu_ids.len()))]
-    pub async fn cascade_soft_delete(pool: &PgPool, menu_ids: &[String]) -> anyhow::Result<u64> {
+    pub async fn cascade_soft_delete(
+        executor: impl sqlx::PgExecutor<'_>,
+        menu_ids: &[String],
+    ) -> anyhow::Result<u64> {
         if menu_ids.is_empty() {
             return Ok(0);
         }
@@ -368,7 +387,7 @@ impl MenuRepo {
         )
         .bind(menu_ids)
         .bind(&updater)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("cascade_soft_delete: update sys_menu")?
         .rows_affected();

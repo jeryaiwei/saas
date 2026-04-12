@@ -61,7 +61,7 @@ impl TenantPackageRepo {
     /// Find a single package by `package_id`, soft-delete filtered.
     #[instrument(skip_all, fields(package_id = %package_id))]
     pub async fn find_by_id(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         package_id: &str,
     ) -> anyhow::Result<Option<SysTenantPackage>> {
         let sql = format!(
@@ -73,7 +73,7 @@ impl TenantPackageRepo {
         );
         let row = sqlx::query_as::<_, SysTenantPackage>(&sql)
             .bind(package_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_id: select sys_tenant_package")?;
         Ok(row)
@@ -157,7 +157,9 @@ impl TenantPackageRepo {
     /// Return active (`status='0'`) packages for dropdown UI — flat list, no
     /// pagination. Hard cap of 500 rows as a safety bound.
     #[instrument(skip_all)]
-    pub async fn find_option_list(pool: &PgPool) -> anyhow::Result<Vec<SysTenantPackage>> {
+    pub async fn find_option_list(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> anyhow::Result<Vec<SysTenantPackage>> {
         let sql = format!(
             "SELECT {COLUMNS} \
                FROM sys_tenant_package \
@@ -167,7 +169,7 @@ impl TenantPackageRepo {
               LIMIT 500"
         );
         let rows = sqlx::query_as::<_, SysTenantPackage>(&sql)
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_option_list: select sys_tenant_package")?;
         Ok(rows)
@@ -177,7 +179,7 @@ impl TenantPackageRepo {
     /// references (e.g. tenant creation). Returns only active rows.
     #[instrument(skip_all, fields(id_count = ids.len()))]
     pub async fn find_active_by_ids(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         ids: &[String],
     ) -> anyhow::Result<Vec<SysTenantPackage>> {
         if ids.is_empty() {
@@ -192,7 +194,7 @@ impl TenantPackageRepo {
         );
         let rows = sqlx::query_as::<_, SysTenantPackage>(&sql)
             .bind(ids)
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_active_by_ids: select sys_tenant_package")?;
         Ok(rows)
@@ -202,7 +204,7 @@ impl TenantPackageRepo {
     /// ignore the current package during an update check.
     #[instrument(skip_all, fields(code = %code))]
     pub async fn verify_code_unique(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         code: &str,
         exclude_id: Option<&str>,
     ) -> anyhow::Result<bool> {
@@ -214,7 +216,7 @@ impl TenantPackageRepo {
         )
         .bind(code)
         .bind(exclude_id)
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
         .context("verify_code_unique: count sys_tenant_package")?;
         Ok(count == 0)
@@ -224,7 +226,7 @@ impl TenantPackageRepo {
     /// to ignore the current package during an update check.
     #[instrument(skip_all, fields(package_name = %name))]
     pub async fn verify_name_unique(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         name: &str,
         exclude_id: Option<&str>,
     ) -> anyhow::Result<bool> {
@@ -236,7 +238,7 @@ impl TenantPackageRepo {
         )
         .bind(name)
         .bind(exclude_id)
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
         .context("verify_name_unique: count sys_tenant_package")?;
         Ok(count == 0)
@@ -245,7 +247,10 @@ impl TenantPackageRepo {
     /// Return `true` when any of the `ids` is referenced by an active tenant.
     /// Used as a guard before bulk delete.
     #[instrument(skip_all, fields(id_count = ids.len()))]
-    pub async fn is_any_in_use(pool: &PgPool, ids: &[String]) -> anyhow::Result<bool> {
+    pub async fn is_any_in_use(
+        executor: impl sqlx::PgExecutor<'_>,
+        ids: &[String],
+    ) -> anyhow::Result<bool> {
         if ids.is_empty() {
             return Ok(false);
         }
@@ -255,7 +260,7 @@ impl TenantPackageRepo {
                 AND del_flag = '0'",
         )
         .bind(ids)
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
         .context("is_any_in_use: count sys_tenant")?;
         Ok(count > 0)
@@ -265,7 +270,7 @@ impl TenantPackageRepo {
     /// Returns the newly-inserted row.
     #[instrument(skip_all, fields(code = %params.code, package_name = %params.package_name))]
     pub async fn insert(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         params: PackageInsertParams,
     ) -> anyhow::Result<SysTenantPackage> {
         let audit = AuditInsert::now();
@@ -289,7 +294,7 @@ impl TenantPackageRepo {
             .bind(&audit.create_by)
             .bind(&audit.update_by)
             .bind(params.remark.as_deref())
-            .fetch_one(pool)
+            .fetch_one(executor)
             .await
             .context("insert: insert sys_tenant_package")?;
         Ok(row)
@@ -299,7 +304,10 @@ impl TenantPackageRepo {
     /// `rows_affected` — 0 means "not found". Audit `update_by` / `update_at`
     /// are always stamped.
     #[instrument(skip_all, fields(package_id = %params.package_id))]
-    pub async fn update_by_id(pool: &PgPool, params: PackageUpdateParams) -> anyhow::Result<u64> {
+    pub async fn update_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: PackageUpdateParams,
+    ) -> anyhow::Result<u64> {
         let updater = audit_update_by();
 
         let affected = sqlx::query(
@@ -323,7 +331,7 @@ impl TenantPackageRepo {
         .bind(params.remark.as_deref())
         .bind(&updater)
         .bind(&params.package_id)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("update_by_id: update sys_tenant_package")?
         .rows_affected();
@@ -333,7 +341,10 @@ impl TenantPackageRepo {
 
     /// Soft-delete a batch of packages (`del_flag = '1'`). Idempotent.
     #[instrument(skip_all, fields(id_count = ids.len()))]
-    pub async fn soft_delete_by_ids(pool: &PgPool, ids: &[String]) -> anyhow::Result<u64> {
+    pub async fn soft_delete_by_ids(
+        executor: impl sqlx::PgExecutor<'_>,
+        ids: &[String],
+    ) -> anyhow::Result<u64> {
         if ids.is_empty() {
             return Ok(0);
         }
@@ -347,7 +358,7 @@ impl TenantPackageRepo {
         )
         .bind(&updater)
         .bind(ids)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("soft_delete_by_ids: update sys_tenant_package")?
         .rows_affected();

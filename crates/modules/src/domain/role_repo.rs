@@ -149,7 +149,10 @@ impl RoleRepo {
 
     /// Find by role_id, tenant-scoped, soft-delete filtered.
     #[instrument(skip_all, fields(role_id = %role_id))]
-    pub async fn find_by_id(pool: &PgPool, role_id: &str) -> anyhow::Result<Option<SysRole>> {
+    pub async fn find_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        role_id: &str,
+    ) -> anyhow::Result<Option<SysRole>> {
         let tenant = current_tenant_scope();
         let sql = format!(
             "SELECT {COLUMNS} \
@@ -162,7 +165,7 @@ impl RoleRepo {
         let row = sqlx::query_as::<_, SysRole>(&sql)
             .bind(role_id)
             .bind(tenant.as_deref())
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_id")?;
         Ok(row)
@@ -173,13 +176,13 @@ impl RoleRepo {
     /// Results are sorted by `menu_id` for deterministic test assertions.
     #[instrument(skip_all, fields(role_id = %role_id))]
     pub async fn find_menu_ids_by_role(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         role_id: &str,
     ) -> anyhow::Result<Vec<String>> {
         let rows: Vec<(String,)> =
             sqlx::query_as("SELECT menu_id FROM sys_role_menu WHERE role_id = $1 ORDER BY menu_id")
                 .bind(role_id)
-                .fetch_all(pool)
+                .fetch_all(executor)
                 .await
                 .context("find_menu_ids_by_role")?;
         Ok(rows.into_iter().map(|(m,)| m).collect())
@@ -407,7 +410,11 @@ impl RoleRepo {
     /// Toggle a role's `status` column. Tenant-scoped, soft-delete filtered.
     /// Returns rows_affected — 0 means "not found in current tenant".
     #[instrument(skip_all, fields(role_id = %role_id, status = %status))]
-    pub async fn change_status(pool: &PgPool, role_id: &str, status: &str) -> anyhow::Result<u64> {
+    pub async fn change_status(
+        executor: impl sqlx::PgExecutor<'_>,
+        role_id: &str,
+        status: &str,
+    ) -> anyhow::Result<u64> {
         let tenant = current_tenant_scope();
         let updater = audit_update_by();
 
@@ -422,7 +429,7 @@ impl RoleRepo {
         .bind(&updater)
         .bind(role_id)
         .bind(tenant.as_deref())
-        .execute(pool)
+        .execute(executor)
         .await
         .context("change_status: update sys_role")?
         .rows_affected();
@@ -433,7 +440,10 @@ impl RoleRepo {
     /// Soft-delete a role by id (sets `del_flag = '1'`). Tenant-scoped.
     /// Returns rows_affected.
     #[instrument(skip_all, fields(role_id = %role_id))]
-    pub async fn soft_delete_by_id(pool: &PgPool, role_id: &str) -> anyhow::Result<u64> {
+    pub async fn soft_delete_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        role_id: &str,
+    ) -> anyhow::Result<u64> {
         let tenant = current_tenant_scope();
         let updater = audit_update_by();
 
@@ -447,7 +457,7 @@ impl RoleRepo {
         .bind(&updater)
         .bind(role_id)
         .bind(tenant.as_deref())
-        .execute(pool)
+        .execute(executor)
         .await
         .context("soft_delete_by_id: update sys_role")?
         .rows_affected();
@@ -458,7 +468,9 @@ impl RoleRepo {
     /// Return active (`status='0'`) roles for dropdown UI — flat list, no
     /// pagination. Tenant-scoped. Hard cap of 500 rows as a safety bound.
     #[instrument(skip_all)]
-    pub async fn find_option_list(pool: &PgPool) -> anyhow::Result<Vec<SysRole>> {
+    pub async fn find_option_list(
+        executor: impl sqlx::PgExecutor<'_>,
+    ) -> anyhow::Result<Vec<SysRole>> {
         let tenant = current_tenant_scope();
         let sql = format!(
             "SELECT {COLUMNS} \
@@ -471,7 +483,7 @@ impl RoleRepo {
         );
         let rows = sqlx::query_as::<_, SysRole>(&sql)
             .bind(tenant.as_deref())
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_option_list: select sys_role")?;
         Ok(rows)
@@ -715,7 +727,7 @@ impl RoleRepo {
     /// binding handles menu_id validation).
     #[instrument(skip_all, fields(role_id = %role_id, user_count = user_ids.len()))]
     pub async fn insert_user_roles(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         role_id: &str,
         user_ids: &[String],
     ) -> anyhow::Result<u64> {
@@ -733,7 +745,7 @@ impl RoleRepo {
         )
         .bind(user_ids)
         .bind(role_id)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("insert_user_roles: bulk insert")?
         .rows_affected();
@@ -749,13 +761,13 @@ impl RoleRepo {
     /// Results are sorted by `role_id` for deterministic assertions.
     #[instrument(skip_all, fields(user_id = %user_id))]
     pub async fn find_role_ids_by_user(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         user_id: &str,
     ) -> anyhow::Result<Vec<String>> {
         let rows: Vec<(String,)> =
             sqlx::query_as("SELECT role_id FROM sys_user_role WHERE user_id = $1 ORDER BY role_id")
                 .bind(user_id)
-                .fetch_all(pool)
+                .fetch_all(executor)
                 .await
                 .context("find_role_ids_by_user")?;
         Ok(rows.into_iter().map(|(r,)| r).collect())
@@ -766,7 +778,7 @@ impl RoleRepo {
     /// SQL level — service layer validates the role before calling.
     #[instrument(skip_all, fields(role_id = %role_id, user_count = user_ids.len()))]
     pub async fn delete_user_roles(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         role_id: &str,
         user_ids: &[String],
     ) -> anyhow::Result<u64> {
@@ -780,7 +792,7 @@ impl RoleRepo {
         )
         .bind(role_id)
         .bind(user_ids)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("delete_user_roles: bulk delete")?
         .rows_affected();
@@ -795,7 +807,7 @@ impl RoleRepo {
     /// Empty input is trivially `Ok(true)` — no bindings to validate.
     #[instrument(skip_all, fields(role_count = role_ids.len()))]
     pub async fn verify_role_ids_in_tenant(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         role_ids: &[String],
     ) -> anyhow::Result<bool> {
         if role_ids.is_empty() {
@@ -810,7 +822,7 @@ impl RoleRepo {
         )
         .bind(role_ids)
         .bind(tenant.as_deref())
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
         .context("verify_role_ids_in_tenant")?;
         Ok(count as usize == role_ids.len())

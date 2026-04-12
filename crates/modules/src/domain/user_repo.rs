@@ -98,7 +98,7 @@ impl UserRepo {
     /// global user lookup during login.
     #[tracing::instrument(skip_all, fields(username = %username))]
     pub async fn find_by_username(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         username: &str,
     ) -> anyhow::Result<Option<SysUser>> {
         let sql = format!(
@@ -107,7 +107,7 @@ impl UserRepo {
         );
         let row = sqlx::query_as::<_, SysUser>(&sql)
             .bind(username)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_username")?;
         Ok(row)
@@ -117,14 +117,17 @@ impl UserRepo {
     /// auth flow which needs global user lookup during login. Admin CRUD
     /// paths use `find_by_id_tenant_scoped` instead.
     #[tracing::instrument(skip_all, fields(user_id = %user_id))]
-    pub async fn find_by_id(pool: &PgPool, user_id: &str) -> anyhow::Result<Option<SysUser>> {
+    pub async fn find_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: &str,
+    ) -> anyhow::Result<Option<SysUser>> {
         let sql = format!(
             "SELECT {USER_COLUMNS} FROM sys_user u \
               WHERE u.user_id = $1 AND u.del_flag = '0' LIMIT 1"
         );
         let row = sqlx::query_as::<_, SysUser>(&sql)
             .bind(user_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_id")?;
         Ok(row)
@@ -141,7 +144,7 @@ impl UserRepo {
     /// global user lookup during login.
     #[tracing::instrument(skip_all, fields(user_id = %user_id))]
     pub async fn find_by_id_tenant_scoped(
-        pool: &sqlx::PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         user_id: &str,
     ) -> anyhow::Result<Option<SysUser>> {
         let tenant = current_tenant_scope();
@@ -158,7 +161,7 @@ impl UserRepo {
         let row = sqlx::query_as::<_, SysUser>(&sql)
             .bind(user_id)
             .bind(tenant.as_deref())
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await
             .context("find_by_id_tenant_scoped: select sys_user")?;
         Ok(row)
@@ -294,7 +297,7 @@ impl UserRepo {
     /// Hard cap 500 rows. Optional `user_name` substring search.
     #[tracing::instrument(skip_all, fields(has_name_filter = user_name.is_some()))]
     pub async fn find_option_list(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         user_name: Option<&str>,
     ) -> anyhow::Result<Vec<SysUser>> {
         let tenant = current_tenant_scope();
@@ -313,7 +316,7 @@ impl UserRepo {
         let rows = sqlx::query_as::<_, SysUser>(&sql)
             .bind(tenant.as_deref())
             .bind(user_name)
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_option_list: select sys_user")?;
         Ok(rows)
@@ -322,7 +325,7 @@ impl UserRepo {
     /// Return all `sys_user_tenant` rows for a user (active only).
     #[tracing::instrument(skip_all, fields(user_id = %user_id))]
     pub async fn find_user_tenants(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         user_id: &str,
     ) -> anyhow::Result<Vec<SysUserTenant>> {
         let sql = r#"
@@ -333,7 +336,7 @@ impl UserRepo {
         "#;
         let rows = sqlx::query_as::<_, SysUserTenant>(sql)
             .bind(user_id)
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("find_user_tenants")?;
         Ok(rows)
@@ -348,7 +351,7 @@ impl UserRepo {
     /// are allowed (same NestJS behavior: `p.menu_ids IS NULL` branch).
     #[tracing::instrument(skip_all, fields(user_id = %user_id, tenant_id = %tenant_id))]
     pub async fn resolve_role_permissions(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         user_id: &str,
         tenant_id: &str,
     ) -> anyhow::Result<Vec<String>> {
@@ -372,7 +375,7 @@ impl UserRepo {
         let rows: Vec<(String,)> = sqlx::query_as(sql)
             .bind(user_id)
             .bind(tenant_id)
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("resolve_role_permissions")?;
         Ok(rows.into_iter().map(|(p,)| p).collect())
@@ -386,7 +389,7 @@ impl UserRepo {
     /// are returned (no restriction). This matches NestJS behavior.
     #[tracing::instrument(skip_all, fields(tenant_id = %tenant_id))]
     pub async fn resolve_all_menu_perms(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         tenant_id: &str,
     ) -> anyhow::Result<Vec<String>> {
         let sql = r#"
@@ -402,7 +405,7 @@ impl UserRepo {
         "#;
         let rows: Vec<(String,)> = sqlx::query_as(sql)
             .bind(tenant_id)
-            .fetch_all(pool)
+            .fetch_all(executor)
             .await
             .context("resolve_all_menu_perms")?;
         Ok(rows.into_iter().map(|(p,)| p).collect())
@@ -512,7 +515,11 @@ impl UserRepo {
     /// Flip user status with tenant + soft-delete guards. Returns
     /// rows_affected — 0 means not found in current tenant.
     #[tracing::instrument(skip_all, fields(user_id = %user_id, status = %status))]
-    pub async fn change_status(pool: &PgPool, user_id: &str, status: &str) -> anyhow::Result<u64> {
+    pub async fn change_status(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: &str,
+        status: &str,
+    ) -> anyhow::Result<u64> {
         let tenant = current_tenant_scope();
         let updater = audit_update_by();
         let affected = sqlx::query(
@@ -531,7 +538,7 @@ impl UserRepo {
         .bind(&updater)
         .bind(user_id)
         .bind(tenant.as_deref())
-        .execute(pool)
+        .execute(executor)
         .await
         .context("change_status: update sys_user")?
         .rows_affected();
@@ -541,7 +548,10 @@ impl UserRepo {
     /// Soft-delete a user (sets `del_flag = '1'`). Tenant guard via EXISTS.
     /// Returns rows_affected — 0 means not found in current tenant.
     #[tracing::instrument(skip_all, fields(user_id = %user_id))]
-    pub async fn soft_delete_by_id(pool: &PgPool, user_id: &str) -> anyhow::Result<u64> {
+    pub async fn soft_delete_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: &str,
+    ) -> anyhow::Result<u64> {
         let tenant = current_tenant_scope();
         let updater = audit_update_by();
         let affected = sqlx::query(
@@ -559,7 +569,7 @@ impl UserRepo {
         .bind(&updater)
         .bind(user_id)
         .bind(tenant.as_deref())
-        .execute(pool)
+        .execute(executor)
         .await
         .context("soft_delete_by_id: update sys_user")?
         .rows_affected();
@@ -571,7 +581,7 @@ impl UserRepo {
     /// The `password_hash` must ALREADY be bcrypt-hashed by the caller.
     #[tracing::instrument(skip_all, fields(user_id = %user_id))]
     pub async fn reset_password(
-        pool: &PgPool,
+        executor: impl sqlx::PgExecutor<'_>,
         user_id: &str,
         password_hash: &str,
     ) -> anyhow::Result<u64> {
@@ -593,7 +603,7 @@ impl UserRepo {
         .bind(&updater)
         .bind(user_id)
         .bind(tenant.as_deref())
-        .execute(pool)
+        .execute(executor)
         .await
         .context("reset_password: update sys_user")?
         .rows_affected();
@@ -610,10 +620,13 @@ impl UserRepo {
     /// on INSERT. Reusing a soft-deleted username is blocked — consistent
     /// with NestJS semantics and DB reality.
     #[tracing::instrument(skip_all, fields(user_name = %user_name))]
-    pub async fn verify_user_name_unique(pool: &PgPool, user_name: &str) -> anyhow::Result<bool> {
+    pub async fn verify_user_name_unique(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_name: &str,
+    ) -> anyhow::Result<bool> {
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sys_user WHERE user_name = $1")
             .bind(user_name)
-            .fetch_one(pool)
+            .fetch_one(executor)
             .await
             .context("verify_user_name_unique")?;
         Ok(count == 0)
@@ -628,7 +641,10 @@ impl UserRepo {
     /// the check must work regardless of which tenant the caller is
     /// currently scoped to.
     #[tracing::instrument(skip_all, fields(user_id = %user_id))]
-    pub async fn is_super_admin(pool: &PgPool, user_id: &str) -> anyhow::Result<bool> {
+    pub async fn is_super_admin(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: &str,
+    ) -> anyhow::Result<bool> {
         let count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM sys_user \
               WHERE user_id = $1 \
@@ -639,7 +655,7 @@ impl UserRepo {
         .bind(user_id)
         .bind(crate::domain::constants::SUPER_ADMIN_USERNAME)
         .bind(PLATFORM_ID_DEFAULT)
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
         .context("is_super_admin")?;
         Ok(count > 0)
