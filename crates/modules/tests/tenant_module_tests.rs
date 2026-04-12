@@ -1,6 +1,5 @@
 //! Integration tests for the tenant module. Real DB at 127.0.0.1:5432/saas_tea.
-//! Run with `--test-threads=1` to avoid concurrent cleanup conflicts between
-//! tests that share the same `sys_tenant` / `sys_tenant_package` tables.
+//! Tests are safe to run in parallel — each test cleans up only its own data.
 
 #[path = "common/mod.rs"]
 mod common;
@@ -86,8 +85,6 @@ async fn create_package_returns_detail() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let dto = make_package_dto(suffix, "0");
         let expected_code = dto.code.clone();
         let expected_name = dto.package_name.clone();
@@ -100,7 +97,7 @@ async fn create_package_returns_detail() {
         assert_eq!(created.package_name, expected_name);
         assert!(created.menu_ids.is_empty());
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -112,8 +109,6 @@ async fn create_package_with_duplicate_code_rejects() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let dto1 = make_package_dto(suffix, "0");
         pkg_service::create(&state, dto1)
             .await
@@ -133,7 +128,7 @@ async fn create_package_with_duplicate_code_rejects() {
             .expect_err("duplicate code should fail");
         assert_business_code(err, ResponseCode::TENANT_PACKAGE_CODE_EXISTS, "dup code");
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -145,8 +140,6 @@ async fn create_package_with_duplicate_name_rejects() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let dto1 = make_package_dto(suffix, "0");
         let expected_name = dto1.package_name.clone();
         pkg_service::create(&state, dto1)
@@ -167,7 +160,7 @@ async fn create_package_with_duplicate_name_rejects() {
             .expect_err("duplicate name should fail");
         assert_business_code(err, ResponseCode::TENANT_PACKAGE_NAME_EXISTS, "dup name");
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -180,8 +173,6 @@ async fn list_packages_returns_paginated() {
     let s2 = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         pkg_service::create(&state, make_package_dto(s1, "0"))
             .await
             .expect("create pkg 1");
@@ -207,7 +198,8 @@ async fn list_packages_returns_paginated() {
             page.rows.len()
         );
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s1}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s2}")).await;
     })
     .await;
 }
@@ -219,8 +211,6 @@ async fn get_package_detail_includes_menu_ids() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let menu_ids = vec!["m1".to_string(), "m2".to_string()];
         let dto = make_package_dto_with_menus(suffix, menu_ids.clone());
         let created = pkg_service::create(&state, dto)
@@ -237,7 +227,7 @@ async fn get_package_detail_includes_menu_ids() {
         actual.sort();
         assert_eq!(actual, expected, "menu_ids should match");
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -249,8 +239,6 @@ async fn update_package_changes_menu_ids() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let dto = make_package_dto_with_menus(suffix, vec!["m1".into(), "m2".into()]);
         let created = pkg_service::create(&state, dto)
             .await
@@ -279,7 +267,7 @@ async fn update_package_changes_menu_ids() {
         expected.sort();
         assert_eq!(actual, expected, "menu_ids should be updated");
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -292,8 +280,6 @@ async fn update_package_name_to_duplicate_rejects() {
     let s2 = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg1 = pkg_service::create(&state, make_package_dto(s1, "0"))
             .await
             .expect("create pkg 1");
@@ -319,7 +305,8 @@ async fn update_package_name_to_duplicate_rejects() {
             "dup name update",
         );
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s1}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s2}")).await;
     })
     .await;
 }
@@ -331,8 +318,6 @@ async fn delete_package_succeeds_when_not_in_use() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let created = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create should succeed");
@@ -350,7 +335,8 @@ async fn delete_package_succeeds_when_not_in_use() {
             "deleted package find",
         );
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        // Package was already deleted by the service; cleanup is a no-op but safe
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -362,9 +348,6 @@ async fn delete_package_in_use_rejects() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -380,8 +363,8 @@ async fn delete_package_in_use_rejects() {
             .expect_err("delete in-use package should fail");
         assert_business_code(err, ResponseCode::TENANT_PACKAGE_IN_USE, "pkg in use");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -395,8 +378,6 @@ async fn option_select_returns_active_only() {
     let s_disabled = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let active_pkg = pkg_service::create(&state, make_package_dto(s_active, "0"))
             .await
             .expect("create active package");
@@ -424,7 +405,8 @@ async fn option_select_returns_active_only() {
             "disabled package should NOT appear in option_select"
         );
 
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s_active}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s_disabled}")).await;
     })
     .await;
 }
@@ -440,9 +422,6 @@ async fn create_tenant_single_package() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -468,8 +447,8 @@ async fn create_tenant_single_package() {
             "tenant_id should be all digits"
         );
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -481,9 +460,6 @@ async fn create_tenant_auto_creates_admin_user() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -504,8 +480,8 @@ async fn create_tenant_auto_creates_admin_user() {
 
         assert!(user_exists, "admin user should be created with the tenant");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -520,9 +496,6 @@ async fn create_tenant_multi_package() {
     let tenant_suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg1 = pkg_service::create(&state, make_package_dto(s1, "0"))
             .await
             .expect("create pkg 1");
@@ -550,8 +523,9 @@ async fn create_tenant_multi_package() {
 
         assert_eq!(count, 2, "should create 2 tenant rows for 2 packages");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{tenant_suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s1}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s2}")).await;
     })
     .await;
 }
@@ -566,9 +540,6 @@ async fn create_tenant_multi_package_names_include_package_name() {
     let tenant_suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg1 = pkg_service::create(&state, make_package_dto(s1, "0"))
             .await
             .expect("create pkg 1");
@@ -602,8 +573,9 @@ async fn create_tenant_multi_package_names_include_package_name() {
         assert!(has_pkg1_name, "one tenant company_name should include pkg1 name");
         assert!(has_pkg2_name, "one tenant company_name should include pkg2 name");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{tenant_suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s1}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s2}")).await;
     })
     .await;
 }
@@ -618,9 +590,6 @@ async fn create_tenant_multi_package_first_binding_is_default() {
     let tenant_suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg1 = pkg_service::create(&state, make_package_dto(s1, "0"))
             .await
             .expect("create pkg 1");
@@ -661,8 +630,9 @@ async fn create_tenant_multi_package_first_binding_is_default() {
             "exactly one binding should be non-default"
         );
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{tenant_suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s1}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{s2}")).await;
     })
     .await;
 }
@@ -695,9 +665,6 @@ async fn create_tenant_duplicate_company_rejects() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -732,8 +699,8 @@ async fn create_tenant_duplicate_company_rejects() {
             .expect_err("duplicate company_name should fail");
         assert_business_code(err, ResponseCode::TENANT_COMPANY_EXISTS, "dup company");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -745,9 +712,6 @@ async fn create_tenant_duplicate_username_rejects() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let s1 = &uuid::Uuid::new_v4().to_string()[..8];
         let s2 = &uuid::Uuid::new_v4().to_string()[..8];
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
@@ -801,8 +765,16 @@ async fn create_tenant_duplicate_username_rejects() {
             .expect_err("duplicate username should fail");
         assert_business_code(err, ResponseCode::DUPLICATE_KEY, "dup username");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        // Tenant has company_name "it-tenant-comp-{s1}" and user_name "it-tenant-{suffix}";
+        // clean each up with its own specific prefix.
+        common::cleanup_test_users(&state.pg, &format!("it-tenant-{suffix}")).await;
+        // After users removed, delete tenants by company_name prefix
+        sqlx::query("DELETE FROM sys_tenant WHERE company_name LIKE $1")
+            .bind(format!("it-tenant-comp-{s1}%"))
+            .execute(&state.pg)
+            .await
+            .expect("cleanup tenant for test 18");
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -814,8 +786,6 @@ async fn create_tenant_invalid_parent_rejects() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -828,8 +798,8 @@ async fn create_tenant_invalid_parent_rejects() {
             .expect_err("invalid parent_id should fail");
         assert_business_code(err, ResponseCode::TENANT_PARENT_NOT_FOUND, "bad parent");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        // Tenant creation failed, so only the package needs cleanup
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -841,9 +811,6 @@ async fn list_tenants_returns_admin_user_name() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -876,8 +843,8 @@ async fn list_tenants_returns_admin_user_name() {
             "list should return admin_user_name for the tenant"
         );
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -893,9 +860,6 @@ async fn list_tenants_filters_by_company_name() {
     let p2 = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg1 = pkg_service::create(&state, make_package_dto(p1, "0"))
             .await
             .expect("create pkg 1");
@@ -930,8 +894,10 @@ async fn list_tenants_filters_by_company_name() {
             "returned tenant should match the filter"
         );
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{s1}")).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{s2}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{p1}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{p2}")).await;
     })
     .await;
 }
@@ -943,9 +909,6 @@ async fn get_tenant_detail_includes_admin_info() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -976,8 +939,8 @@ async fn get_tenant_detail_includes_admin_info() {
             "admin nick_name should be '租户管理员'"
         );
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -1004,9 +967,6 @@ async fn update_tenant_changes_fields() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -1056,8 +1016,8 @@ async fn update_tenant_changes_fields() {
             "contact_phone should be updated"
         );
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }
@@ -1114,9 +1074,6 @@ async fn update_tenant_company_name_duplicate_rejects() {
     let p2 = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg1 = pkg_service::create(&state, make_package_dto(p1, "0"))
             .await
             .expect("create pkg 1");
@@ -1168,8 +1125,10 @@ async fn update_tenant_company_name_duplicate_rejects() {
             .expect_err("rename to duplicate company_name should fail");
         assert_business_code(err, ResponseCode::TENANT_COMPANY_EXISTS, "dup company update");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{s1}")).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{s2}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{p1}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{p2}")).await;
     })
     .await;
 }
@@ -1181,9 +1140,6 @@ async fn delete_tenant_soft_deletes() {
     let suffix = &uuid::Uuid::new_v4().to_string()[..8];
 
     common::as_super_admin(async {
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
-
         let pkg = pkg_service::create(&state, make_package_dto(suffix, "0"))
             .await
             .expect("create package");
@@ -1216,8 +1172,8 @@ async fn delete_tenant_soft_deletes() {
             .expect("should find the row after soft delete");
         assert_eq!(del_flag, "1", "del_flag should be '1' after remove");
 
-        common::cleanup_test_tenants(&state.pg, PREFIX).await;
-        common::cleanup_test_packages(&state.pg, PKG_CODE_PREFIX).await;
+        common::cleanup_test_tenants(&state.pg, &format!("it-tenant-{suffix}")).await;
+        common::cleanup_test_packages(&state.pg, &format!("{PKG_CODE_PREFIX}{suffix}")).await;
     })
     .await;
 }

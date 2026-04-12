@@ -67,10 +67,16 @@ pub async fn create(state: &AppState, dto: CreateTenantDto) -> Result<ApiRespons
         .context("hash_password: create tenant")
         .into_internal()?;
 
-    // 6. Generate base tenant_id from sequence
-    let base_id = TenantRepo::generate_next_tenant_id(&state.pg)
-        .await
-        .into_internal()?;
+    // 6. Pre-allocate one sequence value per package to avoid concurrent collision.
+    //    Each call to nextval is atomic; acquiring all IDs before the transaction
+    //    ensures no two parallel calls share the same tenant_id.
+    let mut allocated_ids: Vec<i64> = Vec::with_capacity(dto.package_ids.len());
+    for _ in 0..dto.package_ids.len() {
+        let id = TenantRepo::generate_next_tenant_id(&state.pg)
+            .await
+            .into_internal()?;
+        allocated_ids.push(id);
+    }
 
     // 7. If multiple packages, collect package names for company name suffixes
     let pkg_names: Vec<String> = if dto.package_ids.len() > 1 {
@@ -98,7 +104,7 @@ pub async fn create(state: &AppState, dto: CreateTenantDto) -> Result<ApiRespons
     // 9. Insert N tenant rows
     let mut created_tenant_ids: Vec<String> = Vec::with_capacity(dto.package_ids.len());
     for (i, package_id) in dto.package_ids.iter().enumerate() {
-        let tenant_id = format!("{:06}", base_id + i as i64);
+        let tenant_id = format!("{:06}", allocated_ids[i]);
         let company_name = if dto.package_ids.len() == 1 {
             dto.company_name.clone()
         } else {
