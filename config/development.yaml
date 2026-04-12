@@ -1,0 +1,61 @@
+# Development config — all values live here (including dev secrets). Overridden
+# only by env vars when running in a non-dev environment. Mirrors
+# server/.env.development for PG/Redis/JWT so the Rust service can share the
+# same `saas_tea` database and Redis instance as NestJS during progressive
+# migration.
+
+server:
+  host: 0.0.0.0
+  # 8080 is NestJS; Rust runs on 18080 so both can coexist during migration.
+  port: 18080
+
+db:
+  postgresql:
+    url: "postgresql://saas_tea:123456@127.0.0.1:5432/saas_tea"
+    max_connections: 50
+    acquire_timeout_sec: 10
+    idle_timeout_sec: 300
+  redis:
+    # ioredis on the NestJS side uses keyPrefix="saas_tea:"; the URL here is
+    # just transport, the `saas_tea:` prefix lives in redis_keys below.
+    url: "redis://:redis_FKxk3i@127.0.0.1:6379/4"
+    pool_size: 16
+
+jwt:
+  # Dev-only secret. ≥ 32 bytes to satisfy `AppConfig::validate`
+  # (security P0 — see crates/framework/src/config/mod.rs).
+  # PROD MUST set APP__JWT__SECRET to a real random 32+ byte value.
+  secret: "dev-only-insecure-jwt-secret-for-local-rust-service-do-not-use-in-prod"
+  # JWT_EXPIRES_IN=1h → 3600s; JWT_REFRESH_EXPIRES_IN=2h → 7200s
+  expires_in_sec: 3600
+  refresh_expires_in_sec: 7200
+
+tenant:
+  enabled: true
+
+cors:
+  origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+    - "http://localhost:8848"
+  app_domain: ""
+
+logger:
+  level: debug
+  dir: ./logs
+  json: false # pretty console output in dev
+  file_rotation: daily
+
+# Redis key prefixes include the NestJS-side ioredis `keyPrefix` (`saas_tea:`)
+# so the Rust service can share the same Redis instance with the legacy
+# backend. Real captcha key layout on disk: saas_tea:captcha_code:{uuid}
+redis_keys:
+  captcha: "saas_tea:captcha_code:"
+  token_blacklist: "saas_tea:token_blacklist:"
+  user_token_version: "saas_tea:user_token_version:"
+  login_session: "saas_tea:login_token_session:"
+
+redis_ttl:
+  captcha: 300
+  token_blacklist: 86400
+  user_token_version: 604800

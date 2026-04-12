@@ -1,0 +1,81 @@
+//! Business response codes.
+//!
+//! Modeled as a newtype around `i32` so new codes can be added without
+//! touching a giant enum match. Aligned with the ranges from
+//! `server/src/shared/response/response.interface.ts`:
+//!
+//! - 200        : Success
+//! - 400-499    : HTTP client errors (validation, auth, forbidden)
+//! - 500-599    : HTTP server errors
+//! - 1000-1029  : General business errors
+//! - 2000-2039  : Auth errors
+//! - 3000-3029  : User errors
+//! - 4000-4029  : Tenant errors
+//! - 5000-5039  : File errors
+//! - 6000-6009  : Third-party errors
+//! - 7000-7099  : System module errors
+//! - 7100-7199  : Message module errors
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ResponseCode(pub i32);
+
+#[allow(non_upper_case_globals)]
+impl ResponseCode {
+    // --- HTTP-aligned ---
+    pub const SUCCESS: Self = Self(200);
+    pub const BAD_REQUEST: Self = Self(400);
+    pub const UNAUTHORIZED: Self = Self(401);
+    pub const FORBIDDEN: Self = Self(403);
+    pub const TOO_MANY_REQUESTS: Self = Self(429);
+    pub const INTERNAL_SERVER_ERROR: Self = Self(500);
+
+    // --- 1000-1029 general business ---
+    pub const PARAM_INVALID: Self = Self(1000);
+    pub const DATA_NOT_FOUND: Self = Self(1001);
+    pub const DUPLICATE_KEY: Self = Self(1002);
+    pub const OPTIMISTIC_LOCK_CONFLICT: Self = Self(1003);
+    pub const OPERATION_NOT_ALLOWED: Self = Self(1004);
+
+    // --- 2000-2039 auth ---
+    pub const TOKEN_INVALID: Self = Self(2001);
+    pub const TOKEN_EXPIRED: Self = Self(2002);
+    pub const ACCOUNT_LOCKED: Self = Self(2003);
+    pub const CAPTCHA_INVALID: Self = Self(2004);
+
+    // --- 3000-3029 user ---
+    pub const USER_NOT_FOUND: Self = Self(3001);
+    pub const INVALID_CREDENTIALS: Self = Self(3002);
+
+    // --- 4000-4029 tenant ---
+    pub const TENANT_DISABLED: Self = Self(4001);
+    pub const TENANT_EXPIRED: Self = Self(4002);
+
+    pub const fn as_i32(self) -> i32 {
+        self.0
+    }
+
+    pub const fn is_success(self) -> bool {
+        self.0 == 200
+    }
+}
+
+impl std::fmt::Display for ResponseCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<ResponseCode> for i32 {
+    fn from(code: ResponseCode) -> Self {
+        code.0
+    }
+}
+
+impl From<i32> for ResponseCode {
+    fn from(v: i32) -> Self {
+        Self(v)
+    }
+}

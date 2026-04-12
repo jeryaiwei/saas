@@ -1,0 +1,47 @@
+# Base config — loaded first, overridden by {env}.yaml then env vars (APP__...).
+# See crates/tea-framework/src/config/ for the strongly-typed AppConfig struct.
+
+server:
+  host: 0.0.0.0
+  port: 8081
+
+db:
+  postgresql:
+    # url set via env var APP__DB__POSTGRESQL__URL
+    max_connections: 20
+    acquire_timeout_sec: 30
+    idle_timeout_sec: 300
+  redis:
+    # url set via env var APP__DB__REDIS__URL
+    pool_size: 16
+
+jwt:
+  # secret set via env var APP__JWT__SECRET (must match NestJS)
+  expires_in_sec: 86400            # 24h — must match NestJS parseExpiresIn("24h")
+  refresh_expires_in_sec: 604800   # 7d
+
+tenant:
+  enabled: true                    # mirrors TENANT_ENABLED in NestJS
+
+cors:
+  origins: []                      # populated from env APP__CORS__ORIGINS (comma-separated)
+  app_domain: ""                   # populated from env APP__CORS__APP_DOMAIN (for subdomain regex)
+
+logger:
+  level: info
+  dir: ./logs
+  json: true
+  file_rotation: daily
+
+# Redis key prefixes — MUST match server/src/shared/constants/index.ts CacheEnum
+redis_keys:
+  captcha: "captcha_code:"
+  token_blacklist: "token_blacklist:"
+  user_token_version: "user_token_version:"
+  login_session: "login_token_session:"
+
+# TTLs in seconds — MUST match NestJS values
+redis_ttl:
+  captcha: 300                     # 5 min
+  token_blacklist: 86400           # 24h
+  user_token_version: 604800       # 7d
