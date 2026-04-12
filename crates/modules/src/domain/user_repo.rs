@@ -194,7 +194,6 @@ impl UserRepo {
     /// sets a tenant; Phase 2 admin tooling must not call this via
     /// `run_ignoring_tenant()` without also deduping on `u.user_id`.
     #[tracing::instrument(skip_all, fields(
-        tenant_id = tracing::field::Empty,
         has_user_name = filter.user_name.is_some(),
         has_status = filter.status.is_some(),
         page_num = filter.page.page_num,
@@ -207,9 +206,6 @@ impl UserRepo {
         filter: UserListFilter,
     ) -> anyhow::Result<framework::response::Page<SysUser>> {
         let tenant = current_tenant_scope();
-        if let Some(t) = tenant.as_deref() {
-            tracing::Span::current().record("tenant_id", t);
-        }
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
         let rows_sql = format!(

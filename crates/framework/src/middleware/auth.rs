@@ -39,6 +39,7 @@ pub struct AuthState {
     pub whitelist: Arc<Vec<String>>,
 }
 
+#[tracing::instrument(skip_all, name = "middleware.auth")]
 pub async fn auth(
     State(state): State<AuthState>,
     mut req: Request,
@@ -105,7 +106,17 @@ pub async fn auth(
         }
     });
 
-    // 5. Stash session + claims in request extensions so that
+    // 5. Propagate session identity to the root span so downstream
+    //    log events carry user_id / user_name / tenant_id without
+    //    every service function having to re-declare them.
+    let span = tracing::Span::current();
+    span.record("user_id", user_session.user_id.as_str());
+    span.record("user_name", user_session.user_name.as_str());
+    if let Some(tid) = user_session.tenant_id.as_deref() {
+        span.record("tenant_id", tid);
+    }
+
+    // 6. Stash session + claims in request extensions so that
     //    `middleware::access::enforce` and handlers can read them.
     req.extensions_mut().insert::<UserSession>(user_session);
     req.extensions_mut().insert::<JwtClaims>(claims);

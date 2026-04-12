@@ -581,36 +581,24 @@ tracing 和 metrics 输出均 **不得** 包含：
 
 | 规范条目                                                       | 当前状态                                     | 需要改动                                                         | 优先级                      |
 | -------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------- | --------------------------- |
-| §3.2 path label                                                | ✅ 已用 MatchedPath（2026-04-12 P0 fix）     | —                                                                | **完成**                    |
-| §2.3 root span 自动注入 `request_id` / `tenant_id` / `user_id` | `tenant_http` 只建 RequestContext，不开 span | `tenant_http` 加 `info_span!` + `.instrument(...)` 包住 next.run | **高**                      |
-| §2.3 废除业务层手写 `Span::current().record("tenant_id", ...)` | 4 处手写（4 个 find_page）                   | 删 4 行                                                          | **高**（和上一条配对）      |
-| §4.4 auth/tenant/access middleware 补 `#[instrument]`          | 0/3                                          | 加 3 个 `#[instrument]`                                          | 中                          |
-| §4.5 `bcrypt::hash_password` instrument                        | 无                                           | 1 个 `#[instrument]`                                             | 中                          |
-| §6.4 auth login 成功 `info!` event                             | 无                                           | 1 行 `tracing::info!(...)`                                       | 低                          |
-| §2.1 `username` vs `user_name` 的语义区分                      | 已是对的（认知 bug）——规范文档化即可         | 文档化到 spec                                                    | **完成**（本规范已写入）    |
-| §2.1 `tenant = %tid` 在 auth service                           | 应为 `tenant_id`                             | 改 1 行                                                          | 低                          |
-| §2.6 业务 metric 起始模板                                      | 无                                           | 文档化到 spec，埋点延期到 v1.2                                   | **完成**（本规范已定义）    |
-| §2.5 cardinality label 审查                                    | 有口头约束，无自动化                         | 走 v2.2                                                          | 延期                        |
-| §5 root span 的 `status` 字段记录                              | 无                                           | `tenant_http` 的 response 后 `.record("status", ...)`            | **高**（和 root span 配对） |
+| §3.2 path label                                                | ✅ 已完成（2026-04-12 P0 fix）                | —                            | ✅ 完成 |
+| §2.3 root span 自动注入 `request_id` / `tenant_id` / `user_id` | ✅ `tenant_http` 创建 `http_request` root span | —                            | ✅ v1.0 |
+| §2.3 废除业务层手写 `Span::current().record("tenant_id", ...)` | ✅ 4 处已删除                                  | —                            | ✅ v1.0 |
+| §4.4 auth/tenant/access middleware 补 `#[instrument]`          | ✅ 3/3 已添加                                  | —                            | ✅ v1.0 |
+| §4.5 `bcrypt::hash_password` instrument                        | ✅ 已添加                                      | —                            | ✅ v1.0 |
+| §6.4 auth login 成功 `info!` event                             | ✅ 已添加                                      | —                            | ✅ v1.0 |
+| §2.1 `username` vs `user_name` 的语义区分                      | ✅ 已文档化                                    | —                            | ✅ 完成 |
+| §2.1 `tenant = %tid` 在 auth service                           | ✅ 已是 `tenant_id`（无需修改）                | —                            | ✅ 完成 |
+| §2.6 业务 metric 起始模板                                      | ✅ 规范已定义                                  | 埋点延期到 v1.2              | ✅ 完成 |
+| §2.5 cardinality label 审查                                    | 有口头约束，无自动化                           | 走 v2.2                      | ⏳ 延期 |
+| §5 root span 的 `status` 字段记录                              | ✅ `tenant_http` response 后 `.record("status")` | —                         | ✅ v1.0 |
 
-**v1.0 必做**（gap 表的"高"优先级，3 项）：
+**v1.0 已全部完成**（2026-04-12）：9/11 gap 已实施，其余 2 项按触发器条件延期：
 
-1. `tenant_http` 升级为 root span 创建者（spec §5 的伪代码）
-2. `auth` middleware 补 `.record("user_id", ...)` / `.record("user_name", ...)` / `.record("tenant_id", ...)`
-3. 删除 4 个 `find_page` 里的 `Span::current().record("tenant_id", ...)` 手写行
-
-**v1.0 次做**（可以同一批，也可以延期）：
-
-4. `bcrypt::hash_password` / `auth` / `tenant` / `access` 的 `#[instrument]` 注解
-5. auth service 登录成功的 `tracing::info!` event
-6. 修复 auth service 的 `tenant = %tid` → `tenant_id = %tid`
-
-**v1.0 不做**（明确延期）：
-
-- 业务 metric 埋点（v1.2）
-- OTEL / OTLP（v2.0）
-- Runtime log level（v2.1）
-- 自动 cardinality 审查（v2.2）
+- ⏳ 业务 metric 首次埋点 → v1.2
+- ⏳ OTLP / OpenTelemetry → v2.0
+- ⏳ Runtime log level reload → v2.1
+- ⏳ Automatic cardinality audit → v2.2
 
 ---
 

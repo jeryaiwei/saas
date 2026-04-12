@@ -205,7 +205,6 @@ impl RoleRepo {
     /// Role tables are small (typically < 1k rows per tenant); seq scan
     /// is acceptable until the global index is added.
     #[instrument(skip_all, fields(
-        tenant_id = tracing::field::Empty,
         has_name = filter.name.is_some(),
         has_role_key = filter.role_key.is_some(),
         has_status = filter.status.is_some(),
@@ -219,9 +218,6 @@ impl RoleRepo {
         filter: RoleListFilter,
     ) -> anyhow::Result<framework::response::Page<SysRole>> {
         let tenant = current_tenant_scope();
-        if let Some(t) = tenant.as_deref() {
-            tracing::Span::current().record("tenant_id", t);
-        }
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
         let rows_sql = format!(
@@ -510,7 +506,6 @@ impl RoleRepo {
     /// - Small roles (< 100 users): < 20ms
     /// - Large roles (> 10k users): up to 300ms; deep pages unsupported
     #[instrument(skip_all, fields(
-        tenant_id = tracing::field::Empty,
         role_id = %filter.role_id,
         has_name_filter = filter.user_name.is_some(),
         page_num = filter.page.page_num,
@@ -523,9 +518,6 @@ impl RoleRepo {
         filter: AllocatedUserFilter,
     ) -> anyhow::Result<framework::response::Page<AllocatedUserRow>> {
         let tenant = current_tenant_scope();
-        if let Some(t) = tenant.as_deref() {
-            tracing::Span::current().record("tenant_id", t);
-        }
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
         let rows_sql = format!(
@@ -621,7 +613,6 @@ impl RoleRepo {
     /// Dominated by `sys_user` table size (the universe); anti-join cost
     /// grows with total tenant user count, not role size.
     #[instrument(skip_all, fields(
-        tenant_id = tracing::field::Empty,
         role_id = %filter.role_id,
         has_name_filter = filter.user_name.is_some(),
         page_num = filter.page.page_num,
@@ -634,9 +625,6 @@ impl RoleRepo {
         filter: AllocatedUserFilter,
     ) -> anyhow::Result<framework::response::Page<AllocatedUserRow>> {
         let tenant = current_tenant_scope();
-        if let Some(t) = tenant.as_deref() {
-            tracing::Span::current().record("tenant_id", t);
-        }
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
         let rows_sql = format!(

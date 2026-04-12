@@ -13,6 +13,7 @@
 
 use bcrypt::{hash, verify, DEFAULT_COST};
 
+#[tracing::instrument(skip_all, name = "infra.crypto.hash_password")]
 pub fn hash_password(plain: &str) -> anyhow::Result<String> {
     hash(plain, DEFAULT_COST).map_err(|e| anyhow::anyhow!("bcrypt hash: {e}"))
 }

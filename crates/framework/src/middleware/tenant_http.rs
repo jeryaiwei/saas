@@ -12,7 +12,13 @@
 
 use crate::context::{scope, RequestContext};
 use crate::i18n;
-use axum::{extract::Request, http::HeaderMap, middleware::Next, response::Response};
+use axum::{
+    extract::{MatchedPath, Request},
+    http::HeaderMap,
+    middleware::Next,
+    response::Response,
+};
+use tracing::{field, info_span, Instrument};
 
 pub async fn tenant_http(req: Request, next: Next) -> Response {
     let headers = req.headers();
@@ -23,6 +29,31 @@ pub async fn tenant_http(req: Request, next: Next) -> Response {
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
+    let method = req.method().as_str().to_owned();
+    let path = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_else(|| "<unmatched>".to_string());
+
+    // Root span — all downstream #[instrument] spans nest inside this one,
+    // so request_id / tenant_id / user_id appear automatically in every log
+    // line. user_id / user_name are filled by auth middleware after session load.
+    let span = info_span!(
+        "http_request",
+        request_id = %request_id,
+        method = %method,
+        path = %path,
+        tenant_id = field::Empty,
+        user_id = field::Empty,
+        user_name = field::Empty,
+        status = field::Empty,
+    );
+
+    if let Some(ref t) = tenant_id {
+        span.record("tenant_id", t.as_str());
+    }
+
     let ctx = RequestContext {
         request_id: Some(request_id),
         tenant_id,
@@ -30,7 +61,13 @@ pub async fn tenant_http(req: Request, next: Next) -> Response {
         ..Default::default()
     };
 
-    scope(ctx, next.run(req)).await
+    async move {
+        let response = scope(ctx, next.run(req)).await;
+        tracing::Span::current().record("status", response.status().as_u16());
+        response
+    }
+    .instrument(span)
+    .await
 }
 
 fn extract_request_id(h: &HeaderMap) -> String {

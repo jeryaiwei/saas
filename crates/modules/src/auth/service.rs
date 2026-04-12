@@ -114,6 +114,12 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
     );
     let token = jwt::encode_token(&claims, &state.config.jwt)?;
 
+    tracing::info!(
+        username = %sess.user_name,
+        user_id = %sess.user_id,
+        "login success"
+    );
+
     Ok(LoginTokenResponseDto {
         access_token: token.clone(),
         refresh_token: Some(token),

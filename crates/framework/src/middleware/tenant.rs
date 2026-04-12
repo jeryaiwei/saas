@@ -25,6 +25,7 @@ pub struct TenantState {
     pub tenant: Arc<TenantConfig>,
 }
 
+#[tracing::instrument(skip_all, name = "middleware.tenant_guard")]
 pub async fn tenant_guard(
     State(state): State<TenantState>,
     req: Request,

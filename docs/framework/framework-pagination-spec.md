@@ -285,7 +285,7 @@ pub async fn find_page(
 **规则**：
 
 - **必须** 有一段 doc comment 包含三个 section：`## Expected indexes`、`## Consistency caveats`、`## Performance expectation`
-- **必须** 用 `#[tracing::instrument]` 标注 `tenant_id`、`page_num`、`page_size`、`rows_len`、`total`（5 个标准字段，`tenant_id/rows_len/total` 用 `field::Empty` 延迟填充）
+- **必须** 用 `#[tracing::instrument]` 标注 `page_num`、`page_size`、`rows_len`、`total`（4 个标准字段，`rows_len/total` 用 `field::Empty` 延迟填充）。**不得** 在 `find_page` 的 instrument 上声明 `tenant_id`——该字段由 root span（`tenant_http` + `auth` middleware）自动继承（obs spec §2.3）
 - **必须** 用 `PaginationParams::from(...)` 而不是裸 `safe_page_num.max(1)` 计算
 - **必须** 用 `p.into_page(rows, total)` 作为收尾，**不得** 手写 `Page::new(rows, total as u64, ...)`
 - **必须** 在 rows 查询和 count 查询**都**绑定完全一致的 WHERE 参数（共享 `const *_PAGE_WHERE: &str`）
@@ -345,13 +345,15 @@ let count_sql = format!("SELECT COUNT(*) FROM sys_user u JOIN ... {USER_PAGE_WHE
 
 ### 6.1 标准字段（每个 `find_page` 必须发出）
 
-| 字段        | 类型           | 来源                     | 用途                               |
-| ----------- | -------------- | ------------------------ | ---------------------------------- |
-| `tenant_id` | Option<String> | `current_tenant_scope()` | 按租户分组性能                     |
-| `page_num`  | u32            | `filter.page.page_num`   | 翻页深度                           |
-| `page_size` | u32            | `filter.page.page_size`  | 批量大小                           |
-| `rows_len`  | u64            | 结果集                   | 实际返回行数（≠ page_size 即尾页） |
-| `total`     | i64            | COUNT query              | 总行数（用于检测深翻页无效请求）   |
+| 字段        | 类型           | 来源                                              | 用途                               |
+| ----------- | -------------- | ------------------------------------------------- | ---------------------------------- |
+| `tenant_id` | Option<String> | root span（auto-inherited from tenant_http + auth） | 按租户分组性能                     |
+| `page_num`  | u32            | `filter.page.page_num`                            | 翻页深度                           |
+| `page_size` | u32            | `filter.page.page_size`                           | 批量大小                           |
+| `rows_len`  | u64            | 结果集                                            | 实际返回行数（≠ page_size 即尾页） |
+| `total`     | i64            | COUNT query                                       | 总行数（用于检测深翻页无效请求）   |
+
+> **注意**：`tenant_id` 由 root span 自动继承，**不得** 在 `find_page` 的 `#[instrument]` 上重复声明该字段（obs spec §2.3）。
 
 **必须** 通过 `#[tracing::instrument(fields(...))]` 声明，**不得** 只在函数体内用 `tracing::info!`。
 
@@ -539,7 +541,7 @@ const XXX_PAGE_WHERE: &str = "\
 - [ ] `find_page` doc comment 有 `## Expected indexes` section
 - [ ] `find_page` doc comment 有 `## Consistency caveats` section
 - [ ] `find_page` doc comment 有 `## Performance expectation` section
-- [ ] `#[tracing::instrument]` 标注了 5 个标准字段（tenant_id, page_num, page_size, rows_len, total）
+- [ ] `#[tracing::instrument]` 标注了 4 个标准字段（page_num, page_size, rows_len, total）——tenant_id 由 root span 自动继承，不得重复声明
 - [ ] WHERE 子句提取成 `const`，rows 和 count 查询共享
 - [ ] 使用 `PaginationParams::from(filter.page.page_num, filter.page.page_size)`
 - [ ] 使用 `p.into_page(rows, total)` 收尾，无 `total as u64` 裸 cast

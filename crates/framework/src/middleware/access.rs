@@ -47,6 +47,11 @@ pub fn require(spec: AccessSpec) -> Arc<AccessSpec> {
     Arc::new(spec)
 }
 
+#[tracing::instrument(skip_all, name = "middleware.access", fields(
+    has_permission = spec.permission.is_some(),
+    has_role = spec.role.is_some(),
+    has_scope = spec.scope.is_some(),
+))]
 pub async fn enforce(
     State(spec): State<Arc<AccessSpec>>,
     req: Request,
