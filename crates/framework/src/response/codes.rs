@@ -75,6 +75,13 @@ impl ResponseCode {
     pub const POST_NOT_FOUND: Self = Self(7050);
     pub const POST_CODE_EXISTS: Self = Self(7051);
     pub const POST_NAME_EXISTS: Self = Self(7052);
+    pub const NOTICE_NOT_FOUND: Self = Self(7060);
+
+    // --- 7100-7199 message module ---
+
+    // --- 7200-7299 monitor module ---
+    pub const OPER_LOG_NOT_FOUND: Self = Self(7200);
+    pub const LOGIN_LOG_NOT_FOUND: Self = Self(7210);
 
     pub const fn as_i32(self) -> i32 {
         self.0

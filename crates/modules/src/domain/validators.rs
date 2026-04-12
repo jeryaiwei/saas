@@ -54,6 +54,15 @@ pub fn validate_yes_no_flag(value: &str) -> Result<(), ValidationError> {
     }
 }
 
+/// Accept only `"1"` (notification) or `"2"` (announcement). Used by
+/// notice DTOs whose `notice_type` field maps to a `char(1)` DB column.
+pub fn validate_notice_type(value: &str) -> Result<(), ValidationError> {
+    match value {
+        "1" | "2" => Ok(()),
+        _ => Err(ValidationError::new("notice_type")),
+    }
+}
+
 /// Accept only `"M"` (menu), `"C"` (directory), `"F"` (function). Used by
 /// menu DTOs whose `menu_type` field maps to a `char(1)` DB column.
 /// (Already validated at menu module — this is shared for reference.)

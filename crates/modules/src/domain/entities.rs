@@ -262,6 +262,60 @@ pub struct SysDictData {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysNotice {
+    pub notice_id: String,
+    pub tenant_id: String,
+    pub notice_title: String,
+    pub notice_type: String,
+    pub notice_content: Option<String>,
+    pub status: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub del_flag: String,
+    pub remark: Option<String>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysOperLog {
+    pub oper_id: String,
+    pub tenant_id: String,
+    pub title: String,
+    pub business_type: i32,
+    pub request_method: String,
+    pub operator_type: i32,
+    pub oper_name: String,
+    pub dept_name: String,
+    pub oper_url: String,
+    pub oper_location: String,
+    pub oper_param: String,
+    pub json_result: String,
+    pub error_msg: String,
+    pub method: String,
+    pub oper_ip: String,
+    pub oper_time: DateTime<Utc>,
+    pub status: String,
+    pub cost_time: i32,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysLogininfor {
+    pub info_id: String,
+    pub tenant_id: String,
+    pub user_name: String,
+    pub ipaddr: String,
+    pub login_location: String,
+    pub browser: String,
+    pub os: String,
+    pub device_type: String,
+    pub status: String,
+    pub msg: String,
+    pub del_flag: String,
+    pub login_time: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
 pub struct SysMenu {
     pub menu_id: String,
     pub menu_name: String,

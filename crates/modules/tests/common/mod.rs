@@ -282,3 +282,48 @@ pub async fn cleanup_test_menus(pool: &PgPool, prefix: &str) {
         .await
         .expect("cleanup sys_menu");
 }
+
+/// Cleanup helper — delete test notices.
+/// Matches `sys_notice.notice_title LIKE '{prefix}%'`.
+pub async fn cleanup_test_notices(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_notices: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_notice WHERE notice_title LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_notice");
+}
+
+/// Cleanup helper — hard delete test oper logs.
+/// Matches `sys_oper_log.title LIKE '{prefix}%'`.
+pub async fn cleanup_test_oper_logs(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_oper_logs: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_oper_log WHERE title LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_oper_log");
+}
+
+/// Cleanup helper — hard delete test login logs.
+/// Matches `sys_logininfor.user_name LIKE '{prefix}%'`.
+pub async fn cleanup_test_login_logs(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_login_logs: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_logininfor WHERE user_name LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_logininfor");
+}

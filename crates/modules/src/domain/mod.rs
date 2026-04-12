@@ -11,7 +11,10 @@ pub mod dept_repo;
 pub mod dict_data_repo;
 pub mod dict_type_repo;
 pub mod entities;
+pub mod login_log_repo;
 pub mod menu_repo;
+pub mod notice_repo;
+pub mod oper_log_repo;
 pub mod post_repo;
 pub mod role_repo;
 pub mod tenant_package_repo;
@@ -28,12 +31,15 @@ pub use dict_type_repo::{
     DictTypeInsertParams, DictTypeListFilter, DictTypeRepo, DictTypeUpdateParams,
 };
 pub use entities::{
-    SysConfig, SysDept, SysDictData, SysDictType, SysMenu, SysPost, SysRole, SysTenant,
-    SysTenantPackage, SysUser, SysUserTenant,
+    SysConfig, SysDept, SysDictData, SysDictType, SysLogininfor, SysMenu, SysNotice, SysOperLog,
+    SysPost, SysRole, SysTenant, SysTenantPackage, SysUser, SysUserTenant,
 };
+pub use login_log_repo::{LoginLogListFilter, LoginLogRepo};
 pub use menu_repo::{
     MenuInsertParams, MenuListFilter, MenuRepo, MenuTreeRow, MenuUpdateParams, RoleMenuTreeRow,
 };
+pub use notice_repo::{NoticeInsertParams, NoticeListFilter, NoticeRepo, NoticeUpdateParams};
+pub use oper_log_repo::{OperLogListFilter, OperLogRepo};
 pub use post_repo::{PostInsertParams, PostListFilter, PostRepo, PostUpdateParams};
 pub use role_repo::{
     AllocatedUserFilter, RoleInsertParams, RoleListFilter, RoleRepo, RoleUpdateParams,
