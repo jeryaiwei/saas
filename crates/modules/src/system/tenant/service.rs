@@ -111,8 +111,8 @@ pub async fn create(state: &AppState, dto: CreateTenantDto) -> Result<ApiRespons
             format!("{}-{}", dto.company_name, pkg_names[i])
         };
 
-        TenantRepo::insert_tx(
-            &mut tx,
+        TenantRepo::insert(
+            &mut *tx,
             TenantInsertParams {
                 tenant_id: tenant_id.clone(),
                 parent_id: dto.parent_id.clone(),
@@ -138,8 +138,8 @@ pub async fn create(state: &AppState, dto: CreateTenantDto) -> Result<ApiRespons
     }
 
     // 10. Create admin user
-    let user = UserRepo::insert_tx(
-        &mut tx,
+    let user = UserRepo::insert(
+        &mut *tx,
         UserInsertParams {
             user_name: dto.username,
             nick_name: "租户管理员".into(),
@@ -159,8 +159,8 @@ pub async fn create(state: &AppState, dto: CreateTenantDto) -> Result<ApiRespons
     // 11. Bind admin user to each tenant
     for (i, created_tenant_id) in created_tenant_ids.iter().enumerate() {
         let is_default = if i == 0 { "1" } else { "0" };
-        TenantRepo::insert_user_tenant_binding_tx(
-            &mut tx,
+        TenantRepo::insert_user_tenant_binding(
+            &mut *tx,
             &user.user_id,
             created_tenant_id,
             is_default,

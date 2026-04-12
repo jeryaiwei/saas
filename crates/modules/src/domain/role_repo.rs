@@ -92,6 +92,8 @@ pub struct AllocatedUserFilter {
 
 /// Write parameters for `RoleRepo::insert_with_menus`. `role_id`,
 /// `tenant_id`, and audit fields are stamped inside the method.
+/// The caller must provide a `&mut Transaction` — the method performs
+/// multiple queries (INSERT role + bulk INSERT role_menus).
 #[derive(Debug)]
 pub struct RoleInsertParams {
     pub role_name: String,
@@ -102,8 +104,9 @@ pub struct RoleInsertParams {
     pub menu_ids: Vec<String>,
 }
 
-/// Write parameters for `RoleRepo::update_with_menus`. The tx-scoped
-/// UPDATE stamps audit fields inside the method.
+/// Write parameters for `RoleRepo::update_with_menus`. The caller must
+/// provide a `&mut Transaction` — the method performs multiple queries.
+/// The UPDATE stamps audit fields inside the method.
 #[derive(Debug)]
 pub struct RoleUpdateParams {
     pub role_id: String,
@@ -282,7 +285,7 @@ impl RoleRepo {
         Ok(p.into_page(rows, total))
     }
 
-    /// Create a role and bind its menus in a single PostgreSQL transaction.
+    /// Create a role and bind its menus inside a caller-provided transaction.
     ///
     /// Returns the newly-inserted `SysRole` row. The caller (service layer)
     /// is expected to have already validated that `menu_ids` reference
@@ -295,18 +298,18 @@ impl RoleRepo {
     /// callers MUST be in a tenant-scoped context (this is enforced by
     /// the route-level access layer — a super-admin `run_ignoring_tenant`
     /// context would return an error here because tenant is required).
+    ///
+    /// Takes `&mut Transaction` because it performs multiple queries (INSERT
+    /// role + bulk INSERT role_menus). The caller manages begin/commit.
     #[instrument(skip_all, fields(role_name = %params.role_name, menu_count = params.menu_ids.len()))]
     pub async fn insert_with_menus(
-        pool: &PgPool,
+        tx: &mut Transaction<'_, Postgres>,
         params: RoleInsertParams,
     ) -> anyhow::Result<SysRole> {
         let audit = AuditInsert::now();
         let tenant = current_tenant_scope()
             .context("insert_with_menus: tenant_id required from RequestContext")?;
         let role_id = uuid::Uuid::new_v4().to_string();
-
-        let mut tx: Transaction<'_, Postgres> =
-            pool.begin().await.context("insert_with_menus: begin tx")?;
 
         // `update_at` is NOT NULL with no DB default (unlike `create_at`
         // which defaults to `CURRENT_TIMESTAMP`), so we stamp it
@@ -329,18 +332,17 @@ impl RoleRepo {
             .bind(&audit.create_by)
             .bind(&audit.update_by)
             .bind(params.remark.as_deref())
-            .fetch_one(&mut *tx)
+            .fetch_one(&mut **tx)
             .await
             .context("insert_with_menus: insert sys_role")?;
 
-        Self::bulk_insert_role_menus(&mut tx, &role_id, &params.menu_ids).await?;
+        Self::bulk_insert_role_menus(tx, &role_id, &params.menu_ids).await?;
 
-        tx.commit().await.context("insert_with_menus: commit tx")?;
         Ok(role)
     }
 
-    /// Update a role's scalar fields AND replace its menu bindings in
-    /// one transaction. Strategy: UPDATE sys_role, then
+    /// Update a role's scalar fields AND replace its menu bindings inside
+    /// a caller-provided transaction. Strategy: UPDATE sys_role, then
     /// `DELETE FROM sys_role_menu WHERE role_id = ?` + bulk re-insert.
     /// Simpler than computing a diff, and safe because `sys_role_menu`
     /// has no audit fields or FK cascades beyond the composite PK.
@@ -353,13 +355,16 @@ impl RoleRepo {
     /// `($8::varchar IS NULL OR tenant_id = $8)` so cross-tenant edits
     /// return affected=0 (same 1001 response as "not found"), which is
     /// the information-hiding strategy documented in the spec.
+    ///
+    /// Takes `&mut Transaction` because it performs multiple queries
+    /// (UPDATE + DELETE + INSERT). The caller manages begin/commit.
     #[instrument(skip_all, fields(role_id = %params.role_id, menu_count = params.menu_ids.len()))]
-    pub async fn update_with_menus(pool: &PgPool, params: RoleUpdateParams) -> anyhow::Result<u64> {
+    pub async fn update_with_menus(
+        tx: &mut Transaction<'_, Postgres>,
+        params: RoleUpdateParams,
+    ) -> anyhow::Result<u64> {
         let tenant = current_tenant_scope();
         let updater = audit_update_by();
-
-        let mut tx: Transaction<'_, Postgres> =
-            pool.begin().await.context("update_with_menus: begin tx")?;
 
         let affected = sqlx::query(
             "UPDATE sys_role \
@@ -378,7 +383,7 @@ impl RoleRepo {
         .bind(&updater)
         .bind(&params.role_id)
         .bind(tenant.as_deref())
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .context("update_with_menus: update sys_role")?
         .rows_affected();
@@ -389,14 +394,13 @@ impl RoleRepo {
             // duplicate menu_ids don't hit the composite PK violation.
             sqlx::query("DELETE FROM sys_role_menu WHERE role_id = $1")
                 .bind(&params.role_id)
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await
                 .context("update_with_menus: delete sys_role_menu")?;
 
-            Self::bulk_insert_role_menus(&mut tx, &params.role_id, &params.menu_ids).await?;
+            Self::bulk_insert_role_menus(tx, &params.role_id, &params.menu_ids).await?;
         }
 
-        tx.commit().await.context("update_with_menus: commit tx")?;
         Ok(affected)
     }
 
@@ -819,8 +823,11 @@ impl RoleRepo {
     /// Empty `role_ids` is a valid "unassign all" operation: the delete
     /// runs, no insert follows. Duplicates in input are deduped via
     /// `SELECT DISTINCT` defense-in-depth against composite PK violations.
+    ///
+    /// Takes `&mut Transaction` because it performs multiple queries
+    /// (DELETE + conditional INSERT). The caller manages begin/commit.
     #[instrument(skip_all, fields(user_id = %user_id, role_count = role_ids.len()))]
-    pub async fn replace_user_roles_tx(
+    pub async fn replace_user_roles(
         tx: &mut Transaction<'_, Postgres>,
         user_id: &str,
         role_ids: &[String],
@@ -829,7 +836,7 @@ impl RoleRepo {
             .bind(user_id)
             .execute(&mut **tx)
             .await
-            .context("replace_user_roles_tx: delete old")?;
+            .context("replace_user_roles: delete old")?;
 
         if !role_ids.is_empty() {
             sqlx::query(
@@ -840,7 +847,7 @@ impl RoleRepo {
             .bind(role_ids)
             .execute(&mut **tx)
             .await
-            .context("replace_user_roles_tx: bulk insert")?;
+            .context("replace_user_roles: bulk insert")?;
         }
 
         Ok(())

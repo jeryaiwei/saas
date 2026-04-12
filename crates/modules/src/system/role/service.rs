@@ -9,6 +9,7 @@ use crate::domain::{
     AllocatedUserFilter, RoleInsertParams, RoleListFilter, RoleRepo, RoleUpdateParams,
 };
 use crate::state::AppState;
+use anyhow::Context;
 use framework::error::{AppError, BusinessCheckBool, BusinessCheckOption, IntoAppError};
 use framework::response::{Page, ResponseCode};
 
@@ -78,8 +79,15 @@ pub async fn create(
     // the detail DTO echoes the submitted list back without a second SELECT.
     let menu_ids = dto.menu_ids.clone();
 
+    let mut tx = state
+        .pg
+        .begin()
+        .await
+        .context("create: begin tx")
+        .into_internal()?;
+
     let role = RoleRepo::insert_with_menus(
-        &state.pg,
+        &mut tx,
         RoleInsertParams {
             role_name: dto.role_name,
             role_key: dto.role_key,
@@ -91,6 +99,11 @@ pub async fn create(
     )
     .await
     .into_internal()?;
+
+    tx.commit()
+        .await
+        .context("create: commit tx")
+        .into_internal()?;
 
     Ok(RoleDetailResponseDto::from_entity(role, menu_ids))
 }
@@ -104,8 +117,15 @@ pub async fn create(
 /// (consistent with `create`). Phase 2 adds it.
 #[tracing::instrument(skip_all, fields(role_id = %dto.role_id, menu_count = dto.menu_ids.len()))]
 pub async fn update(state: &AppState, dto: UpdateRoleDto) -> Result<(), AppError> {
+    let mut tx = state
+        .pg
+        .begin()
+        .await
+        .context("update: begin tx")
+        .into_internal()?;
+
     let affected = RoleRepo::update_with_menus(
-        &state.pg,
+        &mut tx,
         RoleUpdateParams {
             role_id: dto.role_id,
             role_name: dto.role_name,
@@ -118,6 +138,11 @@ pub async fn update(state: &AppState, dto: UpdateRoleDto) -> Result<(), AppError
     )
     .await
     .into_internal()?;
+
+    tx.commit()
+        .await
+        .context("update: commit tx")
+        .into_internal()?;
 
     (affected == 0).business_err_if(ResponseCode::DATA_NOT_FOUND)
 }

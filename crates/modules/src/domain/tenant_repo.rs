@@ -4,7 +4,7 @@
 //! 1. Each method is one SQL statement or one tightly-coupled transaction.
 //! 2. No cross-repo calls — only service.rs orchestrates.
 //! 3. INSERT/UPDATE/DELETE on `sys_tenant` are single-owned here.
-//! 4. `insert_user_tenant_binding_tx` migrated from `user_repo` — this is
+//! 4. `insert_user_tenant_binding` migrated from `user_repo` — this is
 //!    the single owner of `sys_user_tenant` writes.
 //! 5. NOT tenant-scoped (no `current_tenant_scope()`) — tenant management is
 //!    platform-scoped and operates across all tenants.
@@ -13,7 +13,7 @@ use super::entities::SysTenant;
 use anyhow::Context;
 use framework::context::{audit_update_by, AuditInsert};
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::PgPool;
 use std::collections::HashMap;
 use tracing::instrument;
 
@@ -100,7 +100,7 @@ pub struct TenantListFilter {
     pub page: PageQuery,
 }
 
-/// Write parameters for `TenantRepo::insert_tx`.
+/// Write parameters for `TenantRepo::insert`.
 /// `id` (uuid), audit fields, and storage/api quota defaults are stamped
 /// inside the method.
 #[derive(Debug)]
@@ -421,16 +421,16 @@ impl TenantRepo {
         Ok(next_val)
     }
 
-    /// Insert a new `sys_tenant` row inside a caller-provided transaction.
-    /// Returns the inserted `SysTenant` via RETURNING.
+    /// Insert a new `sys_tenant` row using the provided executor (pool or
+    /// transaction). Returns the inserted `SysTenant` via RETURNING.
     ///
     /// - `id` is generated with `uuid::Uuid::new_v4()`
     /// - Audit fields come from `AuditInsert::now()`
     /// - Storage/api quotas default to 0 (callers configure them separately)
     /// - `del_flag = '0'` is hardcoded
     #[instrument(skip_all, fields(tenant_id = %params.tenant_id, company_name = %params.company_name))]
-    pub async fn insert_tx(
-        tx: &mut Transaction<'_, Postgres>,
+    pub async fn insert(
+        executor: impl sqlx::PgExecutor<'_>,
         params: TenantInsertParams,
     ) -> anyhow::Result<SysTenant> {
         let audit = AuditInsert::now();
@@ -475,9 +475,9 @@ impl TenantRepo {
             .bind(&audit.create_by)
             .bind(&audit.update_by)
             .bind(params.remark.as_deref())
-            .fetch_one(&mut **tx)
+            .fetch_one(executor)
             .await
-            .context("insert_tx: insert sys_tenant")?;
+            .context("insert: insert sys_tenant")?;
 
         Ok(tenant)
     }
@@ -556,9 +556,9 @@ impl TenantRepo {
         Ok(affected)
     }
 
-    /// Insert a `sys_user_tenant` row binding `user_id` to `tenant_id` inside
-    /// a caller-provided transaction. Migrated from `UserRepo` — this is now the
-    /// single write owner of `sys_user_tenant`.
+    /// Insert a `sys_user_tenant` row binding `user_id` to `tenant_id` using
+    /// the provided executor (pool or transaction). Migrated from `UserRepo` —
+    /// this is now the single write owner of `sys_user_tenant`.
     ///
     /// Parameters:
     /// - `is_admin`:   `"1"` = admin, `"0"` = regular member
@@ -569,8 +569,8 @@ impl TenantRepo {
     ///
     /// Audit fields come from `AuditInsert::now()`.
     #[instrument(skip_all, fields(user_id = %user_id, tenant_id = %tenant_id, is_admin = %is_admin))]
-    pub async fn insert_user_tenant_binding_tx(
-        tx: &mut Transaction<'_, Postgres>,
+    pub async fn insert_user_tenant_binding(
+        executor: impl sqlx::PgExecutor<'_>,
         user_id: &str,
         tenant_id: &str,
         is_default: &str,
@@ -593,9 +593,9 @@ impl TenantRepo {
         .bind(is_admin)
         .bind(&audit.create_by)
         .bind(&audit.update_by)
-        .execute(&mut **tx)
+        .execute(executor)
         .await
-        .context("insert_user_tenant_binding_tx: insert sys_user_tenant")?;
+        .context("insert_user_tenant_binding: insert sys_user_tenant")?;
         Ok(())
     }
 }

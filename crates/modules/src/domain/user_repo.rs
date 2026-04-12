@@ -10,7 +10,7 @@ use anyhow::Context;
 use framework::constants::{PLATFORM_ID_DEFAULT, USER_TYPE_CUSTOM};
 use framework::context::{audit_update_by, current_tenant_scope, AuditInsert};
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::PgPool;
 
 pub struct UserRepo;
 
@@ -38,10 +38,10 @@ const USER_PAGE_WHERE: &str = "\
       AND ($6::varchar IS NULL OR u.status = $6) \
       AND ($7::varchar IS NULL OR u.dept_id = $7)";
 
-/// Write parameters for `UserRepo::insert_tx`. All fields are owned so
+/// Write parameters for `UserRepo::insert`. All fields are owned so
 /// the service layer can move DTO fields in without lifetime ceremony.
 /// `user_id`, `platform_id`, `user_type`, and audit fields are stamped
-/// inside `insert_tx` — not included here.
+/// inside `insert` — not included here.
 #[derive(Debug)]
 pub struct UserInsertParams {
     pub user_name: String,
@@ -56,8 +56,8 @@ pub struct UserInsertParams {
     pub remark: Option<String>,
 }
 
-/// Write parameters for `UserRepo::update_tx`. Mirrors `UpdateUserDto`
-/// minus `role_ids` (roles are written via `RoleRepo::replace_user_roles_tx`,
+/// Write parameters for `UserRepo::update`. Mirrors `UpdateUserDto`
+/// minus `role_ids` (roles are written via `RoleRepo::replace_user_roles`,
 /// not part of sys_user UPDATE) and minus `user_name` (immutable per
 /// NestJS contract).
 #[derive(Debug)]
@@ -408,16 +408,16 @@ impl UserRepo {
         Ok(rows.into_iter().map(|(p,)| p).collect())
     }
 
-    /// Insert a new sys_user row inside a caller-provided transaction.
-    /// The `password` must ALREADY be bcrypt-hashed — this method does
-    /// NOT hash. Returns the inserted SysUser.
+    /// Insert a new sys_user row using the provided executor (pool or
+    /// transaction). The `password` must ALREADY be bcrypt-hashed — this
+    /// method does NOT hash. Returns the inserted SysUser.
     ///
     /// Audit fields (`create_by` / `update_by`) come from `AuditInsert::now()`.
     /// `platform_id` is hardcoded `'000000'` (multi-platform deferred).
     /// `user_type` is `'10'` (CUSTOM admin user).
     #[tracing::instrument(skip_all, fields(user_name = %params.user_name))]
-    pub async fn insert_tx(
-        tx: &mut Transaction<'_, Postgres>,
+    pub async fn insert(
+        executor: impl sqlx::PgExecutor<'_>,
         params: UserInsertParams,
     ) -> anyhow::Result<SysUser> {
         let audit = AuditInsert::now();
@@ -457,9 +457,9 @@ impl UserRepo {
             .bind(&audit.create_by)
             .bind(&audit.update_by)
             .bind(params.remark.as_deref())
-            .fetch_one(&mut **tx)
+            .fetch_one(executor)
             .await
-            .context("insert_tx: insert sys_user")?;
+            .context("insert: insert sys_user")?;
 
         Ok(user)
     }
@@ -469,8 +469,8 @@ impl UserRepo {
     /// Does NOT touch `user_name` (immutable per NestJS contract) or
     /// `password` (use `reset_password` for that).
     #[tracing::instrument(skip_all, fields(user_id = %params.user_id))]
-    pub async fn update_tx(
-        tx: &mut Transaction<'_, Postgres>,
+    pub async fn update(
+        executor: impl sqlx::PgExecutor<'_>,
         params: UserUpdateParams,
     ) -> anyhow::Result<u64> {
         let tenant = current_tenant_scope();
@@ -501,9 +501,9 @@ impl UserRepo {
         .bind(&updater)
         .bind(&params.user_id)
         .bind(tenant.as_deref())
-        .execute(&mut **tx)
+        .execute(executor)
         .await
-        .context("update_tx: update sys_user")?
+        .context("update: update sys_user")?
         .rows_affected();
 
         Ok(affected)

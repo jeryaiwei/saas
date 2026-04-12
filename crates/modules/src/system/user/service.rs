@@ -142,8 +142,8 @@ pub async fn create(
         .context("create: begin tx")
         .into_internal()?;
 
-    let user = UserRepo::insert_tx(
-        &mut tx,
+    let user = UserRepo::insert(
+        &mut *tx,
         UserInsertParams {
             user_name: dto.user_name,
             nick_name: dto.nick_name,
@@ -165,11 +165,11 @@ pub async fn create(
     let current_tenant = framework::context::current_tenant_scope()
         .context("create user: tenant_id required")
         .into_internal()?;
-    TenantRepo::insert_user_tenant_binding_tx(&mut tx, &user.user_id, &current_tenant, "1", "0")
+    TenantRepo::insert_user_tenant_binding(&mut *tx, &user.user_id, &current_tenant, "1", "0")
         .await
         .into_internal()?;
 
-    RoleRepo::replace_user_roles_tx(&mut tx, &user.user_id, &dto.role_ids)
+    RoleRepo::replace_user_roles(&mut tx, &user.user_id, &dto.role_ids)
         .await
         .into_internal()?;
 
@@ -207,11 +207,11 @@ pub async fn update(state: &AppState, dto: UpdateUserDto) -> Result<(), AppError
         .into_internal()?;
 
     // Clone user_id before moving the rest of dto into the params struct —
-    // RoleRepo::replace_user_roles_tx needs it after the scalar UPDATE.
+    // RoleRepo::replace_user_roles needs it after the scalar UPDATE.
     let user_id = dto.user_id.clone();
 
-    let affected = UserRepo::update_tx(
-        &mut tx,
+    let affected = UserRepo::update(
+        &mut *tx,
         UserUpdateParams {
             user_id: dto.user_id,
             nick_name: dto.nick_name,
@@ -230,7 +230,7 @@ pub async fn update(state: &AppState, dto: UpdateUserDto) -> Result<(), AppError
     (affected == 0).business_err_if(ResponseCode::DATA_NOT_FOUND)?;
 
     // Replace role bindings only after the scalar update succeeded.
-    RoleRepo::replace_user_roles_tx(&mut tx, &user_id, &dto.role_ids)
+    RoleRepo::replace_user_roles(&mut tx, &user_id, &dto.role_ids)
         .await
         .into_internal()?;
 
@@ -403,7 +403,7 @@ pub async fn find_auth_role(
 /// - all role_ids must exist in current tenant
 ///
 /// Empty role_ids is valid ("unassign all"). The underlying
-/// `RoleRepo::replace_user_roles_tx` handles the DELETE-all + optional
+/// `RoleRepo::replace_user_roles` handles the DELETE-all + optional
 /// bulk INSERT inside the caller's transaction.
 #[tracing::instrument(skip_all, fields(user_id = %dto.user_id, role_count = dto.role_ids.len()))]
 pub async fn update_auth_role(state: &AppState, dto: AuthRoleUpdateDto) -> Result<(), AppError> {
@@ -437,7 +437,7 @@ pub async fn update_auth_role(state: &AppState, dto: AuthRoleUpdateDto) -> Resul
         .context("update_auth_role: begin tx")
         .into_internal()?;
 
-    RoleRepo::replace_user_roles_tx(&mut tx, &dto.user_id, &dto.role_ids)
+    RoleRepo::replace_user_roles(&mut tx, &dto.user_id, &dto.role_ids)
         .await
         .into_internal()?;
 
