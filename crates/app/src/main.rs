@@ -22,7 +22,7 @@ use framework::{
     infra::{pg, redis},
     middleware::{
         auth::{self as auth_mw, AuthState},
-        telemetry as telemetry_mw, tenant as tenant_mw, tenant_http,
+        operlog, telemetry as telemetry_mw, tenant as tenant_mw, tenant_http,
     },
     telemetry,
 };
@@ -104,6 +104,7 @@ async fn main() -> anyhow::Result<()> {
     // updating `modules::api_router()`; both this binary and the test
     // harness pick up the change automatically.
     let (api_router, openapi) = modules::api_router_and_openapi();
+    let operlog_pool = state.pg.clone();
     let app = Router::new()
         .nest(API_PREFIX, api_router)
         .merge(modules::health::router())
@@ -111,6 +112,9 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state)
         // innermost custom layers
         .layer(from_fn_with_state(tenant_state, tenant_mw::tenant_guard))
+        .layer(from_fn(move |req, next| {
+            operlog::global_operlog(operlog_pool.clone(), req, next)
+        }))
         .layer(from_fn_with_state(auth_state, auth_mw::auth))
         // telemetry
         .layer(from_fn(telemetry_mw::metrics_middleware))

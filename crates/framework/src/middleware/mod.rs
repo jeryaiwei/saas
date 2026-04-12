@@ -15,6 +15,8 @@
 pub mod access;
 pub mod access_macros;
 pub mod auth;
+pub mod operlog;
+pub mod operlog_macros;
 pub mod telemetry;
 pub mod tenant;
 pub mod tenant_http;
