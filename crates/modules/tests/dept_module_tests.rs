@@ -582,3 +582,60 @@ async fn exclude_list_excludes_self_and_descendants() {
     })
     .await;
 }
+
+// ─── Test 15: cross-tenant isolation ────────────────────────────────────────
+
+/// Verify that a dept created under a different tenant_id is NOT visible
+/// to the default test tenant (000000). This proves tenant scoping works
+/// at the repo layer — all queries include the `($N IS NULL OR tenant_id=$N)`
+/// guard, so data from other tenants never leaks.
+#[tokio::test]
+async fn dept_is_tenant_scoped_cross_tenant_invisible() {
+    let (state, _) = common::build_state_and_router().await;
+    let suffix = &uuid::Uuid::new_v4().to_string()[..8];
+
+    common::as_super_admin(async {
+        // Insert a dept directly via SQL under a DIFFERENT tenant
+        let other_tenant = "T99999";
+        let other_dept_name = format!("{PREFIX}{suffix}-other");
+        sqlx::query(
+            "INSERT INTO sys_dept \
+               (dept_id, tenant_id, parent_id, ancestors, dept_name, order_num, \
+                leader, phone, email, status, del_flag, create_by, update_by, update_at) \
+             VALUES (gen_random_uuid(), $1, '0', ARRAY['0'], $2, 0, '', '', '', '0', '0', '', '', CURRENT_TIMESTAMP)",
+        )
+        .bind(other_tenant)
+        .bind(&other_dept_name)
+        .execute(&state.pg)
+        .await
+        .expect("insert other-tenant dept");
+
+        // List depts under the test tenant (000000) — the other-tenant
+        // dept must NOT appear.
+        let list = dept_service::list(
+            &state,
+            dept_dto::ListDeptDto {
+                dept_name: Some(other_dept_name.clone()),
+                status: None,
+            },
+        )
+        .await
+        .expect("list depts");
+
+        assert!(
+            list.is_empty(),
+            "dept from tenant {other_tenant} must not be visible to tenant 000000, \
+             but list returned {} items",
+            list.len()
+        );
+
+        // Cleanup the cross-tenant row directly
+        sqlx::query("DELETE FROM sys_dept WHERE dept_name = $1 AND tenant_id = $2")
+            .bind(&other_dept_name)
+            .bind(other_tenant)
+            .execute(&state.pg)
+            .await
+            .expect("cleanup other-tenant dept");
+    })
+    .await;
+}
