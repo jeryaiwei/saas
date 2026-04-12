@@ -36,6 +36,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::info;
+use utoipa_swagger_ui::SwaggerUi;
 
 /// NestJS global prefix `/api` + URI versioning `/v1` — mounted under every
 /// API route so the Vue web frontend and Flutter app hit identical URLs
@@ -105,6 +106,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .nest(API_PREFIX, modules::api_router())
         .merge(modules::health::router())
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", modules::api_openapi()))
         .with_state(state)
         // innermost custom layers
         .layer(from_fn_with_state(tenant_state, tenant_mw::tenant_guard))
@@ -136,9 +138,11 @@ fn default_whitelist() -> Vec<String> {
         // API routes under /api/v1 prefix
         format!("POST:{API_PREFIX}/auth/login"),
         format!("GET:{API_PREFIX}/auth/code"),
-        // Infra routes (no prefix)
+        // Infra / docs routes (no prefix)
         "/health".into(),
         "GET:/metrics".into(),
+        "/swagger-ui".into(),
+        "/api-docs".into(),
     ]
 }
 

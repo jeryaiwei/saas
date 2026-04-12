@@ -13,8 +13,6 @@
 
 use crate::config::{RedisKeyConfig, RedisTtlConfig};
 use crate::infra::redis::RedisPool;
-use rand::Rng;
-
 #[derive(Debug, Clone)]
 pub struct CaptchaCode {
     pub uuid: String,
@@ -30,10 +28,9 @@ pub async fn generate_and_store(
     ttl: &RedisTtlConfig,
 ) -> anyhow::Result<CaptchaCode> {
     let uuid = uuid::Uuid::new_v4().to_string();
-    let text: String = {
-        let mut rng = rand::thread_rng();
-        (0..4).map(|_| rng.gen_range(0..10).to_string()).collect()
-    };
+    let text: String = (0..4)
+        .map(|_| rand::random_range(0..10).to_string())
+        .collect();
     let key = format!("{}{}", keys.captcha, uuid);
 
     let mut conn = pool

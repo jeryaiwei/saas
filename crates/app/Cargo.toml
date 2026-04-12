@@ -20,3 +20,6 @@ tracing.workspace = true
 axum.workspace = true
 tower-http.workspace = true
 regex.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+utoipa-swagger-ui.workspace = true

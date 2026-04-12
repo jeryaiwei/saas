@@ -13,7 +13,12 @@ use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_authenticated, require_permission, require_role};
 
-async fn find_by_id(
+#[utoipa::path(get, path = "/system/user/{id}", tag = "用户管理",
+    summary = "查询用户详情",
+    params(("id" = String, Path, description = "user id")),
+    responses((status = 200, body = ApiResponse<dto::UserDetailResponseDto>))
+)]
+pub(crate) async fn find_by_id(
     State(state): State<AppState>,
     Path(user_id): Path<String>,
 ) -> Result<ApiResponse<dto::UserDetailResponseDto>, AppError> {
@@ -21,7 +26,12 @@ async fn find_by_id(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn list(
+#[utoipa::path(get, path = "/system/user/list", tag = "用户管理",
+    summary = "用户列表",
+    params(dto::ListUserDto),
+    responses((status = 200, body = ApiResponse<Page<dto::UserListItemResponseDto>>))
+)]
+pub(crate) async fn list(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::ListUserDto>,
 ) -> Result<ApiResponse<Page<dto::UserListItemResponseDto>>, AppError> {
@@ -29,7 +39,12 @@ async fn list(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn option_select(
+#[utoipa::path(get, path = "/system/user/option-select", tag = "用户管理",
+    summary = "用户下拉选项",
+    params(dto::UserOptionQueryDto),
+    responses((status = 200, body = ApiResponse<Vec<dto::UserOptionResponseDto>>))
+)]
+pub(crate) async fn option_select(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::UserOptionQueryDto>,
 ) -> Result<ApiResponse<Vec<dto::UserOptionResponseDto>>, AppError> {
@@ -37,14 +52,23 @@ async fn option_select(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn info(
+#[utoipa::path(get, path = "/system/user/info", tag = "用户管理",
+    summary = "获取当前用户详情",
+    responses((status = 200, body = ApiResponse<dto::UserInfoResponseDto>))
+)]
+pub(crate) async fn info(
     State(state): State<AppState>,
 ) -> Result<ApiResponse<dto::UserInfoResponseDto>, AppError> {
     let resp = service::info(&state).await?;
     Ok(ApiResponse::ok(resp))
 }
 
-async fn create(
+#[utoipa::path(post, path = "/system/user/", tag = "用户管理",
+    summary = "新增用户",
+    request_body = dto::CreateUserDto,
+    responses((status = 200, body = ApiResponse<dto::UserDetailResponseDto>))
+)]
+pub(crate) async fn create(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::CreateUserDto>,
 ) -> Result<ApiResponse<dto::UserDetailResponseDto>, AppError> {
@@ -52,7 +76,12 @@ async fn create(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn update(
+#[utoipa::path(put, path = "/system/user/", tag = "用户管理",
+    summary = "修改用户",
+    request_body = dto::UpdateUserDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::UpdateUserDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -60,7 +89,12 @@ async fn update(
     Ok(ApiResponse::success())
 }
 
-async fn change_status(
+#[utoipa::path(put, path = "/system/user/change-status", tag = "用户管理",
+    summary = "修改用户状态",
+    request_body = dto::ChangeUserStatusDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn change_status(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::ChangeUserStatusDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -68,7 +102,12 @@ async fn change_status(
     Ok(ApiResponse::success())
 }
 
-async fn remove(
+#[utoipa::path(delete, path = "/system/user/{id}", tag = "用户管理",
+    summary = "删除用户",
+    params(("id" = String, Path, description = "user ids, comma separated")),
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn remove(
     State(state): State<AppState>,
     Path(ids): Path<String>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -76,7 +115,12 @@ async fn remove(
     Ok(ApiResponse::success())
 }
 
-async fn reset_password(
+#[utoipa::path(put, path = "/system/user/reset-pwd", tag = "用户管理",
+    summary = "重置密码",
+    request_body = dto::ResetPwdDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn reset_password(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::ResetPwdDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -84,7 +128,12 @@ async fn reset_password(
     Ok(ApiResponse::success())
 }
 
-async fn auth_role(
+#[utoipa::path(get, path = "/system/user/auth-role/{id}", tag = "用户管理",
+    summary = "查询用户授权角色",
+    params(("id" = String, Path, description = "user id")),
+    responses((status = 200, body = ApiResponse<dto::AuthRoleResponseDto>))
+)]
+pub(crate) async fn auth_role(
     State(state): State<AppState>,
     Path(user_id): Path<String>,
 ) -> Result<ApiResponse<dto::AuthRoleResponseDto>, AppError> {
@@ -92,7 +141,12 @@ async fn auth_role(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn update_auth_role(
+#[utoipa::path(put, path = "/system/user/auth-role", tag = "用户管理",
+    summary = "修改用户授权角色",
+    request_body = dto::AuthRoleUpdateDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update_auth_role(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::AuthRoleUpdateDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -147,3 +201,19 @@ pub fn router() -> Router<AppState> {
             delete(remove).route_layer(require_role!(Role::TenantAdmin)),
         )
 }
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(
+    find_by_id,
+    list,
+    option_select,
+    info,
+    create,
+    update,
+    change_status,
+    remove,
+    reset_password,
+    auth_role,
+    update_auth_role
+))]
+pub struct UserApi;

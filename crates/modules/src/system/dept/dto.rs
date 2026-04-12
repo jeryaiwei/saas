@@ -12,7 +12,7 @@ use validator::Validate;
 
 /// Full dept detail. Returned by most dept endpoints.
 /// Excludes `tenant_id`, `del_flag`, and `i18n` (internal fields).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DeptResponseDto {
     pub dept_id: String,
@@ -57,7 +57,7 @@ impl DeptResponseDto {
 // ---------------------------------------------------------------------------
 
 /// Request body for `POST /system/dept/`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDeptDto {
     /// Use `"0"` for root department.
@@ -81,7 +81,7 @@ pub struct CreateDeptDto {
 
 /// Request body for `PUT /system/dept/`.
 /// `dept_id` and `parent_id` are required; all other fields are optional.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDeptDto {
     pub dept_id: String,
@@ -103,7 +103,7 @@ pub struct UpdateDeptDto {
 }
 
 /// Query string for `GET /system/dept/list`. Non-paginated.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListDeptDto {
     pub dept_name: Option<String>,

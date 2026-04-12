@@ -11,7 +11,7 @@ use validator::Validate;
 // ---------------------------------------------------------------------------
 
 /// Full tenant detail returned by `GET /system/tenant/{id}`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TenantDetailResponseDto {
     pub id: String,
@@ -117,7 +117,7 @@ impl TenantDetailResponseDto {
 }
 
 /// Lightweight row for `GET /system/tenant/list`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TenantListItemResponseDto {
     pub id: String,
@@ -164,7 +164,7 @@ fn default_language() -> String {
 }
 
 /// Request body for `POST /system/tenant/`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTenantDto {
     #[validate(length(min = 1, max = 100))]
@@ -217,7 +217,7 @@ pub struct CreateTenantDto {
 }
 
 /// Request body for `PUT /system/tenant/`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateTenantDto {
     /// Surrogate PK (UUID). Used to find and update the record.
@@ -262,7 +262,7 @@ pub struct UpdateTenantDto {
 }
 
 /// Query string for `GET /system/tenant/list`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTenantDto {
     pub tenant_id: Option<String>,

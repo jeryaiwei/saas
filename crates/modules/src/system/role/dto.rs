@@ -8,7 +8,7 @@ use validator::Validate;
 
 /// Full role detail, including bound menu ids. Returned by
 /// `GET /system/role/:id` and `POST /system/role/`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RoleDetailResponseDto {
     pub role_id: String,
@@ -56,7 +56,7 @@ impl RoleDetailResponseDto {
 
 /// Query string for `GET /system/role/list`. Extracted via
 /// `ValidatedQuery` which runs validation before the handler sees it.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListRoleDto {
     pub role_name: Option<String>,
@@ -69,7 +69,7 @@ pub struct ListRoleDto {
 
 /// Lightweight row shape for the role list page. Excludes menu bindings
 /// and audit-only fields to keep payload size predictable.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RoleListItemResponseDto {
     pub role_id: String,
@@ -97,7 +97,7 @@ impl RoleListItemResponseDto {
 
 /// Request body for `POST /system/role/`. Wire-compatible with the
 /// NestJS `CreateRoleRequestDto`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateRoleDto {
     #[validate(length(min = 1, max = 30))]
@@ -123,7 +123,7 @@ pub struct CreateRoleDto {
 /// Request body for `PUT /system/role/`. Wire-compatible with NestJS
 /// `UpdateRoleRequestDto`. Note `role_id` is in the body (NestJS
 /// convention for PUT) not the URL path.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateRoleDto {
     #[validate(length(min = 1, max = 36))]
@@ -143,7 +143,7 @@ pub struct UpdateRoleDto {
 }
 
 /// Request body for `PUT /system/role/change-status`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangeRoleStatusDto {
     #[validate(length(min = 1, max = 36))]
@@ -154,7 +154,7 @@ pub struct ChangeRoleStatusDto {
 
 /// Dropdown-optimized flat projection of `SysRole`. Returned by
 /// `GET /system/role/option-select`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RoleOptionResponseDto {
     pub role_id: String,
@@ -175,7 +175,7 @@ impl RoleOptionResponseDto {
 /// Query string for `GET /system/role/auth-user/allocated-list` and
 /// `GET /system/role/auth-user/unallocated-list`. Reuses `PageQuery` via
 /// flatten so pagination validation matches `ListRoleDto`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthUserListQueryDto {
     #[validate(length(min = 1, max = 36))]
@@ -191,7 +191,7 @@ pub struct AuthUserListQueryDto {
 }
 
 /// Wire response row for allocated/unallocated user list endpoints.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AllocatedUserResponseDto {
     pub user_id: String,
@@ -220,7 +220,7 @@ impl AllocatedUserResponseDto {
 /// Request body for `PUT /system/role/auth-user/select-all`.
 /// Bulk-assigns `user_ids` to `role_id`. Idempotent — the backend
 /// uses `ON CONFLICT DO NOTHING` so re-submissions are safe.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthUserAssignDto {
     #[validate(length(min = 1, max = 36))]
@@ -235,7 +235,7 @@ pub struct AuthUserAssignDto {
 /// Bulk-removes `user_ids` from `role_id`. Shape is identical to
 /// `AuthUserAssignDto` but kept as a distinct type to match the
 /// NestJS wire contract (separate DTOs per endpoint).
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthUserCancelDto {
     #[validate(length(min = 1, max = 36))]

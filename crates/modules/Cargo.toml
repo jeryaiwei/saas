@@ -21,6 +21,7 @@ validator.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 async-trait.workspace = true
+utoipa.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true }

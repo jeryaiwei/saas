@@ -10,7 +10,7 @@ use validator::Validate;
 // Response DTOs
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigResponseDto {
     pub config_id: String,
@@ -48,7 +48,7 @@ impl ConfigResponseDto {
 // Request DTOs
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateConfigDto {
     #[validate(length(min = 1, max = 100))]
@@ -70,7 +70,7 @@ fn default_config_type() -> String {
     "N".into()
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateConfigDto {
     pub config_id: String,
@@ -87,7 +87,7 @@ pub struct UpdateConfigDto {
 }
 
 /// Update config value by key.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateConfigByKeyDto {
     #[validate(length(min = 1, max = 100))]
@@ -95,7 +95,7 @@ pub struct UpdateConfigByKeyDto {
     pub config_value: String,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListConfigDto {
     pub config_name: Option<String>,

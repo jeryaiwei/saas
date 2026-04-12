@@ -13,14 +13,24 @@ use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_access, require_permission};
 
-async fn create(
+#[utoipa::path(post, path = "/system/tenant/", tag = "租户管理",
+    summary = "新增租户",
+    request_body = dto::CreateTenantDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn create(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::CreateTenantDto>,
 ) -> Result<ApiResponse<()>, AppError> {
     service::create(&state, dto).await
 }
 
-async fn update(
+#[utoipa::path(put, path = "/system/tenant/", tag = "租户管理",
+    summary = "修改租户",
+    request_body = dto::UpdateTenantDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::UpdateTenantDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -28,7 +38,12 @@ async fn update(
     Ok(ApiResponse::success())
 }
 
-async fn list(
+#[utoipa::path(get, path = "/system/tenant/list", tag = "租户管理",
+    summary = "租户列表",
+    params(dto::ListTenantDto),
+    responses((status = 200, body = ApiResponse<Page<dto::TenantListItemResponseDto>>))
+)]
+pub(crate) async fn list(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::ListTenantDto>,
 ) -> Result<ApiResponse<Page<dto::TenantListItemResponseDto>>, AppError> {
@@ -36,7 +51,12 @@ async fn list(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn find_by_id(
+#[utoipa::path(get, path = "/system/tenant/{id}", tag = "租户管理",
+    summary = "查询租户详情",
+    params(("id" = String, Path, description = "tenant id")),
+    responses((status = 200, body = ApiResponse<dto::TenantDetailResponseDto>))
+)]
+pub(crate) async fn find_by_id(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<ApiResponse<dto::TenantDetailResponseDto>, AppError> {
@@ -44,7 +64,12 @@ async fn find_by_id(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn remove(
+#[utoipa::path(delete, path = "/system/tenant/{id}", tag = "租户管理",
+    summary = "删除租户",
+    params(("id" = String, Path, description = "tenant ids, comma separated")),
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn remove(
     State(state): State<AppState>,
     Path(ids): Path<String>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -84,3 +109,7 @@ pub fn router() -> Router<AppState> {
             }),
         )
 }
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(create, update, list, find_by_id, remove))]
+pub struct TenantApi;

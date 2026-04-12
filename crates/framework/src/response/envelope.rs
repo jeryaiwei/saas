@@ -19,7 +19,7 @@ use axum::{
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiResponse<T> {
     pub code: i32,

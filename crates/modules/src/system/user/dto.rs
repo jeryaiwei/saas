@@ -10,7 +10,7 @@ use validator::Validate;
 
 /// Full user detail returned by `GET /system/user/:id` and `POST /system/user/`.
 /// Excludes the `password` field — NEVER include it in any wire response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserDetailResponseDto {
     pub user_id: String,
@@ -57,7 +57,7 @@ impl UserDetailResponseDto {
 }
 
 /// Lightweight row for `GET /system/user/list`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserListItemResponseDto {
     pub user_id: String,
@@ -88,7 +88,7 @@ impl UserListItemResponseDto {
 }
 
 /// Query string for `GET /system/user/list`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListUserDto {
     #[validate(length(max = 50))]
@@ -107,7 +107,7 @@ pub struct ListUserDto {
 }
 
 /// Optional search query for `GET /system/user/option-select`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOptionQueryDto {
     #[validate(length(max = 50))]
@@ -115,7 +115,7 @@ pub struct UserOptionQueryDto {
 }
 
 /// Dropdown-optimized flat user projection.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOptionResponseDto {
     pub user_id: String,
@@ -135,7 +135,7 @@ impl UserOptionResponseDto {
 
 /// Response for `GET /system/user/info`. Leaner than Phase 0's
 /// `/api/v1/info` — returns just the current user's basic fields.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserInfoResponseDto {
     pub user_id: String,
@@ -167,7 +167,7 @@ impl UserInfoResponseDto {
 
 /// Request body for `POST /system/user/`. Wire-compatible with
 /// NestJS `CreateUserRequestDto`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateUserDto {
     pub dept_id: Option<String>,
@@ -203,7 +203,7 @@ pub struct CreateUserDto {
 }
 
 /// Request body for `PUT /system/user/change-status`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangeUserStatusDto {
     #[validate(length(min = 1, max = 36))]
@@ -218,7 +218,7 @@ pub struct ChangeUserStatusDto {
 ///
 /// Excludes `user_name` (immutable per NestJS contract) and `password`
 /// (changed via `PUT /system/user/reset-pwd` only).
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateUserDto {
     #[validate(length(min = 1, max = 36))]
@@ -248,7 +248,7 @@ pub struct UpdateUserDto {
 /// Request body for `PUT /system/user/reset-pwd`. Admin password reset
 /// — no old-password verification required. The super-admin row cannot
 /// be reset by this endpoint (blocked by the service guard).
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ResetPwdDto {
     #[validate(length(min = 1, max = 36))]
@@ -263,7 +263,7 @@ pub struct ResetPwdDto {
 /// user's detail shape with their current role_ids list. Duplicates
 /// `role_ids` at the top level for convenience on the frontend (the
 /// Vue role-assignment dialog reads the top-level field).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthRoleResponseDto {
     /// Target user profile — **without** `role_ids`. The role list
@@ -281,7 +281,7 @@ pub struct AuthRoleResponseDto {
 /// role list lives at the enclosing struct's top level and duplicating
 /// it inside the user sub-object would serialize twice and force a
 /// `Vec<String>` clone in the service layer.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserProfileResponseDto {
     pub user_id: String,
@@ -328,7 +328,7 @@ impl UserProfileResponseDto {
 /// Request body for `PUT /system/user/auth-role`. Replaces the target
 /// user's role bindings entirely (delete-all + bulk insert). Empty
 /// `role_ids` is the "unassign all" operation.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthRoleUpdateDto {
     #[validate(length(min = 1, max = 36))]

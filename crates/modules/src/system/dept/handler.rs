@@ -12,7 +12,12 @@ use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::ApiResponse;
 use framework::{require_authenticated, require_permission};
 
-async fn create(
+#[utoipa::path(post, path = "/system/dept/", tag = "部门管理",
+    summary = "新增部门",
+    request_body = dto::CreateDeptDto,
+    responses((status = 200, body = ApiResponse<dto::DeptResponseDto>))
+)]
+pub(crate) async fn create(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::CreateDeptDto>,
 ) -> Result<ApiResponse<dto::DeptResponseDto>, AppError> {
@@ -20,7 +25,12 @@ async fn create(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn update(
+#[utoipa::path(put, path = "/system/dept/", tag = "部门管理",
+    summary = "修改部门",
+    request_body = dto::UpdateDeptDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::UpdateDeptDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -28,7 +38,12 @@ async fn update(
     Ok(ApiResponse::success())
 }
 
-async fn list(
+#[utoipa::path(get, path = "/system/dept/list", tag = "部门管理",
+    summary = "部门列表",
+    params(dto::ListDeptDto),
+    responses((status = 200, body = ApiResponse<Vec<dto::DeptResponseDto>>))
+)]
+pub(crate) async fn list(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::ListDeptDto>,
 ) -> Result<ApiResponse<Vec<dto::DeptResponseDto>>, AppError> {
@@ -36,14 +51,23 @@ async fn list(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn option_select(
+#[utoipa::path(get, path = "/system/dept/option-select", tag = "部门管理",
+    summary = "部门下拉选项",
+    responses((status = 200, body = ApiResponse<Vec<dto::DeptResponseDto>>))
+)]
+pub(crate) async fn option_select(
     State(state): State<AppState>,
 ) -> Result<ApiResponse<Vec<dto::DeptResponseDto>>, AppError> {
     let resp = service::option_select(&state).await?;
     Ok(ApiResponse::ok(resp))
 }
 
-async fn exclude_list(
+#[utoipa::path(get, path = "/system/dept/list/exclude/{id}", tag = "部门管理",
+    summary = "部门列表（排除指定节点）",
+    params(("id" = String, Path, description = "dept id to exclude")),
+    responses((status = 200, body = ApiResponse<Vec<dto::DeptResponseDto>>))
+)]
+pub(crate) async fn exclude_list(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<ApiResponse<Vec<dto::DeptResponseDto>>, AppError> {
@@ -51,7 +75,12 @@ async fn exclude_list(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn find_by_id(
+#[utoipa::path(get, path = "/system/dept/{id}", tag = "部门管理",
+    summary = "查询部门详情",
+    params(("id" = String, Path, description = "dept id")),
+    responses((status = 200, body = ApiResponse<dto::DeptResponseDto>))
+)]
+pub(crate) async fn find_by_id(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<ApiResponse<dto::DeptResponseDto>, AppError> {
@@ -59,7 +88,12 @@ async fn find_by_id(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn remove(
+#[utoipa::path(delete, path = "/system/dept/{id}", tag = "部门管理",
+    summary = "删除部门",
+    params(("id" = String, Path, description = "dept id")),
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn remove(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -99,3 +133,7 @@ pub fn router() -> Router<AppState> {
             delete(remove).route_layer(require_permission!("system:dept:remove")),
         )
 }
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(create, update, list, option_select, exclude_list, find_by_id, remove))]
+pub struct DeptApi;

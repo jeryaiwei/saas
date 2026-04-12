@@ -12,7 +12,12 @@ use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
 use framework::{require_authenticated, require_permission};
 
-async fn find_by_id(
+#[utoipa::path(get, path = "/system/role/{id}", tag = "角色管理",
+    summary = "查询角色详情",
+    params(("id" = String, Path, description = "role id")),
+    responses((status = 200, body = ApiResponse<dto::RoleDetailResponseDto>))
+)]
+pub(crate) async fn find_by_id(
     State(state): State<AppState>,
     Path(role_id): Path<String>,
 ) -> Result<ApiResponse<dto::RoleDetailResponseDto>, AppError> {
@@ -20,7 +25,12 @@ async fn find_by_id(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn list(
+#[utoipa::path(get, path = "/system/role/list", tag = "角色管理",
+    summary = "角色列表",
+    params(dto::ListRoleDto),
+    responses((status = 200, body = ApiResponse<Page<dto::RoleListItemResponseDto>>))
+)]
+pub(crate) async fn list(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::ListRoleDto>,
 ) -> Result<ApiResponse<Page<dto::RoleListItemResponseDto>>, AppError> {
@@ -28,7 +38,12 @@ async fn list(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn create(
+#[utoipa::path(post, path = "/system/role/", tag = "角色管理",
+    summary = "新增角色",
+    request_body = dto::CreateRoleDto,
+    responses((status = 200, body = ApiResponse<dto::RoleDetailResponseDto>))
+)]
+pub(crate) async fn create(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::CreateRoleDto>,
 ) -> Result<ApiResponse<dto::RoleDetailResponseDto>, AppError> {
@@ -36,7 +51,12 @@ async fn create(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn update(
+#[utoipa::path(put, path = "/system/role/", tag = "角色管理",
+    summary = "修改角色",
+    request_body = dto::UpdateRoleDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::UpdateRoleDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -44,7 +64,12 @@ async fn update(
     Ok(ApiResponse::success())
 }
 
-async fn change_status(
+#[utoipa::path(put, path = "/system/role/change-status", tag = "角色管理",
+    summary = "修改角色状态",
+    request_body = dto::ChangeRoleStatusDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn change_status(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::ChangeRoleStatusDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -52,7 +77,12 @@ async fn change_status(
     Ok(ApiResponse::success())
 }
 
-async fn remove(
+#[utoipa::path(delete, path = "/system/role/{id}", tag = "角色管理",
+    summary = "删除角色",
+    params(("id" = String, Path, description = "role ids, comma separated")),
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn remove(
     State(state): State<AppState>,
     Path(role_id): Path<String>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -60,14 +90,23 @@ async fn remove(
     Ok(ApiResponse::success())
 }
 
-async fn option_select(
+#[utoipa::path(get, path = "/system/role/option-select", tag = "角色管理",
+    summary = "角色下拉选项",
+    responses((status = 200, body = ApiResponse<Vec<dto::RoleOptionResponseDto>>))
+)]
+pub(crate) async fn option_select(
     State(state): State<AppState>,
 ) -> Result<ApiResponse<Vec<dto::RoleOptionResponseDto>>, AppError> {
     let resp = service::option_select(&state).await?;
     Ok(ApiResponse::ok(resp))
 }
 
-async fn allocated_users(
+#[utoipa::path(get, path = "/system/role/auth-user/allocated-list", tag = "角色管理",
+    summary = "已分配用户列表",
+    params(dto::AuthUserListQueryDto),
+    responses((status = 200, body = ApiResponse<Page<dto::AllocatedUserResponseDto>>))
+)]
+pub(crate) async fn allocated_users(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::AuthUserListQueryDto>,
 ) -> Result<ApiResponse<Page<dto::AllocatedUserResponseDto>>, AppError> {
@@ -75,7 +114,12 @@ async fn allocated_users(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn unallocated_users(
+#[utoipa::path(get, path = "/system/role/auth-user/unallocated-list", tag = "角色管理",
+    summary = "未分配用户列表",
+    params(dto::AuthUserListQueryDto),
+    responses((status = 200, body = ApiResponse<Page<dto::AllocatedUserResponseDto>>))
+)]
+pub(crate) async fn unallocated_users(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::AuthUserListQueryDto>,
 ) -> Result<ApiResponse<Page<dto::AllocatedUserResponseDto>>, AppError> {
@@ -83,7 +127,12 @@ async fn unallocated_users(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn assign_users(
+#[utoipa::path(put, path = "/system/role/auth-user/select-all", tag = "角色管理",
+    summary = "批量授权用户",
+    request_body = dto::AuthUserAssignDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn assign_users(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::AuthUserAssignDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -91,7 +140,12 @@ async fn assign_users(
     Ok(ApiResponse::success())
 }
 
-async fn unassign_users(
+#[utoipa::path(put, path = "/system/role/auth-user/cancel", tag = "角色管理",
+    summary = "批量取消授权",
+    request_body = dto::AuthUserCancelDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn unassign_users(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::AuthUserCancelDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -146,3 +200,19 @@ pub fn router() -> Router<AppState> {
             delete(remove).route_layer(require_permission!("system:role:remove")),
         )
 }
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(
+    find_by_id,
+    list,
+    create,
+    update,
+    change_status,
+    remove,
+    option_select,
+    allocated_users,
+    unallocated_users,
+    assign_users,
+    unassign_users
+))]
+pub struct RoleApi;

@@ -12,7 +12,7 @@ use validator::Validate;
 
 /// Full menu detail. Returned by `GET /system/menu/{menuId}` and
 /// `POST /system/menu/`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MenuDetailResponseDto {
     pub menu_id: String,
@@ -67,7 +67,8 @@ impl MenuDetailResponseDto {
 }
 
 /// Generic tree node — id, label, children. Used for dropdown tree UIs.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(no_recursion)]
 pub struct TreeNode {
     pub id: String,
     pub label: String,
@@ -76,7 +77,7 @@ pub struct TreeNode {
 }
 
 /// Response for role-menu tree selection endpoints.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MenuTreeSelectResponseDto {
     pub menus: Vec<TreeNode>,
@@ -88,7 +89,7 @@ pub struct MenuTreeSelectResponseDto {
 // ---------------------------------------------------------------------------
 
 /// Request body for `POST /system/menu/`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateMenuDto {
     #[validate(length(min = 1, max = 50))]
@@ -123,7 +124,7 @@ pub struct CreateMenuDto {
 
 /// Request body for `PUT /system/menu/`.
 /// `menu_id` is required; all other fields are optional.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateMenuDto {
     pub menu_id: String,
@@ -156,7 +157,7 @@ pub struct UpdateMenuDto {
 }
 
 /// Query string for `GET /system/menu/list`. Non-paginated.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListMenuDto {
     pub menu_name: Option<String>,

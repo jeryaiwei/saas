@@ -10,7 +10,7 @@ use validator::Validate;
 // DictType Response / Request DTOs
 // ===========================================================================
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DictTypeResponseDto {
     pub dict_id: String,
@@ -40,7 +40,7 @@ impl DictTypeResponseDto {
     }
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDictTypeDto {
     #[validate(length(min = 1, max = 100))]
@@ -53,7 +53,7 @@ pub struct CreateDictTypeDto {
     pub remark: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDictTypeDto {
     pub dict_id: String,
@@ -66,7 +66,7 @@ pub struct UpdateDictTypeDto {
     pub remark: Option<Option<String>>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListDictTypeDto {
     pub dict_name: Option<String>,
@@ -81,7 +81,7 @@ pub struct ListDictTypeDto {
 // DictData Response / Request DTOs
 // ===========================================================================
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DictDataResponseDto {
     pub dict_code: String,
@@ -121,7 +121,7 @@ impl DictDataResponseDto {
     }
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDictDataDto {
     #[validate(length(min = 1, max = 100))]
@@ -149,7 +149,7 @@ fn default_is_default() -> String {
     "N".into()
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDictDataDto {
     pub dict_code: String,
@@ -169,7 +169,7 @@ pub struct UpdateDictDataDto {
     pub remark: Option<Option<String>>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListDictDataDto {
     pub dict_type: Option<String>,

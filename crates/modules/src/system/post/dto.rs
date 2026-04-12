@@ -10,7 +10,7 @@ use validator::Validate;
 // Response DTOs
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PostResponseDto {
     pub post_id: String,
@@ -50,7 +50,7 @@ impl PostResponseDto {
 // Request DTOs
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePostDto {
     #[validate(length(min = 1, max = 64))]
@@ -68,7 +68,7 @@ pub struct CreatePostDto {
     pub remark: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePostDto {
     pub post_id: String,
@@ -85,7 +85,7 @@ pub struct UpdatePostDto {
     pub remark: Option<Option<String>>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListPostDto {
     pub post_name: Option<String>,

@@ -12,7 +12,7 @@ use validator::Validate;
 
 /// Full package detail. Returned by `GET /system/tenant-package/{id}` and
 /// `POST /system/tenant-package/`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageDetailResponseDto {
     pub package_id: String,
@@ -47,7 +47,7 @@ impl PackageDetailResponseDto {
 }
 
 /// Lightweight row shape for the package list page.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageListItemResponseDto {
     pub package_id: String,
@@ -71,7 +71,7 @@ impl PackageListItemResponseDto {
 
 /// Dropdown-optimized flat projection. Returned by
 /// `GET /system/tenant-package/option-select`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageOptionResponseDto {
     pub package_id: String,
@@ -94,7 +94,7 @@ impl PackageOptionResponseDto {
 // ---------------------------------------------------------------------------
 
 /// Request body for `POST /system/tenant-package/`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePackageDto {
     #[validate(length(min = 1, max = 20))]
@@ -114,7 +114,7 @@ pub struct CreatePackageDto {
 
 /// Request body for `PUT /system/tenant-package/`.
 /// All non-id fields are `Option` — only the provided fields are updated.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePackageDto {
     #[validate(length(min = 1, max = 36))]
@@ -132,7 +132,7 @@ pub struct UpdatePackageDto {
 }
 
 /// Query string for `GET /system/tenant-package/list`.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListPackageDto {
     pub package_name: Option<String>,

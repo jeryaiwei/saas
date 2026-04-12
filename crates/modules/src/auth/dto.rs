@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 pub struct LoginDto {
     #[validate(length(min = 1, max = 64))]
     pub username: String,
@@ -19,7 +19,7 @@ pub struct LoginDto {
 /// Matches NestJS `LoginTokenResponseDto` — **snake_case** on the wire
 /// (unlike most DTOs which are camelCase), because the legacy backend uses
 /// these exact field names.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct LoginTokenResponseDto {
     pub access_token: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -35,14 +35,14 @@ pub struct LoginTokenResponseDto {
     pub openid: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct CaptchaCodeResponseDto {
     pub uuid: String,
     /// Base64-encoded SVG/PNG. Phase 0 stub returns an empty string.
     pub img: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrentUserInfoResponseDto {
     pub user_id: String,

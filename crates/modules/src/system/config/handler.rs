@@ -12,7 +12,12 @@ use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::require_permission;
 use framework::response::{ApiResponse, Page};
 
-async fn create(
+#[utoipa::path(post, path = "/system/config/", tag = "配置管理",
+    summary = "新增配置",
+    request_body = dto::CreateConfigDto,
+    responses((status = 200, body = ApiResponse<dto::ConfigResponseDto>))
+)]
+pub(crate) async fn create(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::CreateConfigDto>,
 ) -> Result<ApiResponse<dto::ConfigResponseDto>, AppError> {
@@ -20,7 +25,12 @@ async fn create(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn update(
+#[utoipa::path(put, path = "/system/config/", tag = "配置管理",
+    summary = "修改配置",
+    request_body = dto::UpdateConfigDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::UpdateConfigDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -28,7 +38,12 @@ async fn update(
     Ok(ApiResponse::success())
 }
 
-async fn update_by_key(
+#[utoipa::path(put, path = "/system/config/key", tag = "配置管理",
+    summary = "按键名修改配置值",
+    request_body = dto::UpdateConfigByKeyDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update_by_key(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::UpdateConfigByKeyDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -36,7 +51,12 @@ async fn update_by_key(
     Ok(ApiResponse::success())
 }
 
-async fn list(
+#[utoipa::path(get, path = "/system/config/list", tag = "配置管理",
+    summary = "配置列表",
+    params(dto::ListConfigDto),
+    responses((status = 200, body = ApiResponse<Page<dto::ConfigResponseDto>>))
+)]
+pub(crate) async fn list(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::ListConfigDto>,
 ) -> Result<ApiResponse<Page<dto::ConfigResponseDto>>, AppError> {
@@ -44,7 +64,12 @@ async fn list(
     Ok(ApiResponse::ok(page))
 }
 
-async fn find_by_id(
+#[utoipa::path(get, path = "/system/config/{id}", tag = "配置管理",
+    summary = "查询配置详情",
+    params(("id" = String, Path, description = "config id")),
+    responses((status = 200, body = ApiResponse<dto::ConfigResponseDto>))
+)]
+pub(crate) async fn find_by_id(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<ApiResponse<dto::ConfigResponseDto>, AppError> {
@@ -52,7 +77,12 @@ async fn find_by_id(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn find_by_key(
+#[utoipa::path(get, path = "/system/config/key/{config_key}", tag = "配置管理",
+    summary = "按键名查询配置",
+    params(("config_key" = String, Path, description = "config key")),
+    responses((status = 200, body = ApiResponse<dto::ConfigResponseDto>))
+)]
+pub(crate) async fn find_by_key(
     State(state): State<AppState>,
     Path(key): Path<String>,
 ) -> Result<ApiResponse<dto::ConfigResponseDto>, AppError> {
@@ -60,7 +90,12 @@ async fn find_by_key(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn remove(
+#[utoipa::path(delete, path = "/system/config/{id}", tag = "配置管理",
+    summary = "删除配置",
+    params(("id" = String, Path, description = "ids, comma separated")),
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn remove(
     State(state): State<AppState>,
     Path(ids): Path<String>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -100,3 +135,7 @@ pub fn router() -> Router<AppState> {
             delete(remove).route_layer(require_permission!("system:config:remove")),
         )
 }
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(create, update, update_by_key, list, find_by_id, find_by_key, remove))]
+pub struct ConfigApi;

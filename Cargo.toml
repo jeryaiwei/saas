@@ -78,12 +78,17 @@ config = { version = "0.15.22", default-features = false, features = [
 # Validation
 validator = { version = "0.20.0", features = ["derive"] }
 
+# OpenAPI / Swagger
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-axum = "0.2"
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
+
 # Utils
 once_cell = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
-rand = "0.8"
+rand = "0.10.1"
 regex = "1"
 
 [profile.release]

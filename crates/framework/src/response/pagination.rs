@@ -36,7 +36,7 @@ pub const QUERY_TIMEOUT_SECS: u64 = 5;
 /// time. See `docs/framework/framework-pagination-spec.md` §6.2.
 pub const SLOW_QUERY_WARN_MS: u128 = 300;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Page<T> {
     pub rows: Vec<T>,
@@ -105,7 +105,7 @@ impl<T> Page<T> {
 ///     pub page: PageQuery,
 /// }
 /// ```
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct PageQuery {
     #[validate(range(min = 1, max = PAGE_NUM_MAX))]

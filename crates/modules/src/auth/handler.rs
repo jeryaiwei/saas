@@ -18,7 +18,12 @@ use framework::error::AppError;
 use framework::extractors::ValidatedJson;
 use framework::response::ApiResponse;
 
-async fn login(
+#[utoipa::path(post, path = "/auth/login", tag = "认证",
+    summary = "用户登录",
+    request_body = dto::LoginDto,
+    responses((status = 200, body = ApiResponse<dto::LoginTokenResponseDto>))
+)]
+pub(crate) async fn login(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::LoginDto>,
 ) -> Result<ApiResponse<dto::LoginTokenResponseDto>, AppError> {
@@ -26,14 +31,22 @@ async fn login(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn get_code(
+#[utoipa::path(get, path = "/auth/code", tag = "认证",
+    summary = "获取验证码",
+    responses((status = 200, body = ApiResponse<dto::CaptchaCodeResponseDto>))
+)]
+pub(crate) async fn get_code(
     State(state): State<AppState>,
 ) -> Result<ApiResponse<dto::CaptchaCodeResponseDto>, AppError> {
     let resp = service::get_captcha(&state).await?;
     Ok(ApiResponse::ok(resp))
 }
 
-async fn logout(
+#[utoipa::path(post, path = "/auth/logout", tag = "认证",
+    summary = "退出登录",
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn logout(
     State(state): State<AppState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -41,7 +54,11 @@ async fn logout(
     Ok(ApiResponse::success())
 }
 
-async fn get_info(
+#[utoipa::path(get, path = "/info", tag = "认证",
+    summary = "获取当前用户信息",
+    responses((status = 200, body = ApiResponse<dto::CurrentUserInfoResponseDto>))
+)]
+pub(crate) async fn get_info(
     State(state): State<AppState>,
     Extension(session): Extension<UserSession>,
 ) -> Result<ApiResponse<dto::CurrentUserInfoResponseDto>, AppError> {
@@ -56,3 +73,7 @@ pub fn router() -> Router<AppState> {
         .route("/auth/logout", post(logout))
         .route("/info", get(get_info))
 }
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(login, get_code, logout, get_info))]
+pub struct AuthApi;

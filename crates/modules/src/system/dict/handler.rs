@@ -20,7 +20,12 @@ use framework::{require_authenticated, require_permission};
 // DictType handlers
 // ---------------------------------------------------------------------------
 
-async fn create_type(
+#[utoipa::path(post, path = "/system/dict/type", tag = "字典管理",
+    summary = "新增字典类型",
+    request_body = dto::CreateDictTypeDto,
+    responses((status = 200, body = ApiResponse<dto::DictTypeResponseDto>))
+)]
+pub(crate) async fn create_type(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::CreateDictTypeDto>,
 ) -> Result<ApiResponse<dto::DictTypeResponseDto>, AppError> {
@@ -28,7 +33,12 @@ async fn create_type(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn update_type(
+#[utoipa::path(put, path = "/system/dict/type", tag = "字典管理",
+    summary = "修改字典类型",
+    request_body = dto::UpdateDictTypeDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update_type(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::UpdateDictTypeDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -36,7 +46,12 @@ async fn update_type(
     Ok(ApiResponse::success())
 }
 
-async fn list_types(
+#[utoipa::path(get, path = "/system/dict/type/list", tag = "字典管理",
+    summary = "字典类型列表",
+    params(dto::ListDictTypeDto),
+    responses((status = 200, body = ApiResponse<Page<dto::DictTypeResponseDto>>))
+)]
+pub(crate) async fn list_types(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::ListDictTypeDto>,
 ) -> Result<ApiResponse<Page<dto::DictTypeResponseDto>>, AppError> {
@@ -44,14 +59,23 @@ async fn list_types(
     Ok(ApiResponse::ok(page))
 }
 
-async fn type_option_select(
+#[utoipa::path(get, path = "/system/dict/type/option-select", tag = "字典管理",
+    summary = "字典类型下拉选项",
+    responses((status = 200, body = ApiResponse<Vec<dto::DictTypeResponseDto>>))
+)]
+pub(crate) async fn type_option_select(
     State(state): State<AppState>,
 ) -> Result<ApiResponse<Vec<dto::DictTypeResponseDto>>, AppError> {
     let resp = service::type_option_select(&state).await?;
     Ok(ApiResponse::ok(resp))
 }
 
-async fn find_type_by_id(
+#[utoipa::path(get, path = "/system/dict/type/{id}", tag = "字典管理",
+    summary = "查询字典类型详情",
+    params(("id" = String, Path, description = "dict type ID")),
+    responses((status = 200, body = ApiResponse<dto::DictTypeResponseDto>))
+)]
+pub(crate) async fn find_type_by_id(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<ApiResponse<dto::DictTypeResponseDto>, AppError> {
@@ -59,7 +83,12 @@ async fn find_type_by_id(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn remove_types(
+#[utoipa::path(delete, path = "/system/dict/type/{id}", tag = "字典管理",
+    summary = "删除字典类型",
+    params(("id" = String, Path, description = "dict type IDs (comma-separated)")),
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn remove_types(
     State(state): State<AppState>,
     Path(ids): Path<String>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -71,7 +100,12 @@ async fn remove_types(
 // DictData handlers
 // ---------------------------------------------------------------------------
 
-async fn create_data(
+#[utoipa::path(post, path = "/system/dict/data", tag = "字典管理",
+    summary = "新增字典数据",
+    request_body = dto::CreateDictDataDto,
+    responses((status = 200, body = ApiResponse<dto::DictDataResponseDto>))
+)]
+pub(crate) async fn create_data(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::CreateDictDataDto>,
 ) -> Result<ApiResponse<dto::DictDataResponseDto>, AppError> {
@@ -79,7 +113,12 @@ async fn create_data(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn update_data(
+#[utoipa::path(put, path = "/system/dict/data", tag = "字典管理",
+    summary = "修改字典数据",
+    request_body = dto::UpdateDictDataDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update_data(
     State(state): State<AppState>,
     ValidatedJson(dto): ValidatedJson<dto::UpdateDictDataDto>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -87,7 +126,12 @@ async fn update_data(
     Ok(ApiResponse::success())
 }
 
-async fn list_data(
+#[utoipa::path(get, path = "/system/dict/data/list", tag = "字典管理",
+    summary = "字典数据列表",
+    params(dto::ListDictDataDto),
+    responses((status = 200, body = ApiResponse<Page<dto::DictDataResponseDto>>))
+)]
+pub(crate) async fn list_data(
     State(state): State<AppState>,
     ValidatedQuery(query): ValidatedQuery<dto::ListDictDataDto>,
 ) -> Result<ApiResponse<Page<dto::DictDataResponseDto>>, AppError> {
@@ -95,7 +139,12 @@ async fn list_data(
     Ok(ApiResponse::ok(page))
 }
 
-async fn find_data_by_id(
+#[utoipa::path(get, path = "/system/dict/data/{id}", tag = "字典管理",
+    summary = "查询字典数据详情",
+    params(("id" = String, Path, description = "dict data ID")),
+    responses((status = 200, body = ApiResponse<dto::DictDataResponseDto>))
+)]
+pub(crate) async fn find_data_by_id(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<ApiResponse<dto::DictDataResponseDto>, AppError> {
@@ -103,7 +152,12 @@ async fn find_data_by_id(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn find_data_by_type(
+#[utoipa::path(get, path = "/system/dict/data/type/{dict_type}", tag = "字典管理",
+    summary = "按类型查询字典数据",
+    params(("dict_type" = String, Path, description = "dict type name")),
+    responses((status = 200, body = ApiResponse<Vec<dto::DictDataResponseDto>>))
+)]
+pub(crate) async fn find_data_by_type(
     State(state): State<AppState>,
     Path(dict_type): Path<String>,
 ) -> Result<ApiResponse<Vec<dto::DictDataResponseDto>>, AppError> {
@@ -111,7 +165,12 @@ async fn find_data_by_type(
     Ok(ApiResponse::ok(resp))
 }
 
-async fn remove_data(
+#[utoipa::path(delete, path = "/system/dict/data/{id}", tag = "字典管理",
+    summary = "删除字典数据",
+    params(("id" = String, Path, description = "dict data IDs (comma-separated)")),
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn remove_data(
     State(state): State<AppState>,
     Path(ids): Path<String>,
 ) -> Result<ApiResponse<()>, AppError> {
@@ -173,3 +232,20 @@ pub fn router() -> Router<AppState> {
             delete(remove_data).route_layer(require_permission!("system:dict-data:remove")),
         )
 }
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(
+    create_type,
+    update_type,
+    list_types,
+    type_option_select,
+    find_type_by_id,
+    remove_types,
+    create_data,
+    update_data,
+    list_data,
+    find_data_by_id,
+    find_data_by_type,
+    remove_data
+))]
+pub struct DictApi;
