@@ -58,14 +58,14 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
     //    - Non-admins → user → role → role-menu → menu join.
     //    - No tenant binding → empty list.
     let permissions = match chosen_tenant_id.as_deref() {
-        Some(tid) if is_admin => UserRepo::resolve_all_menu_perms(&state.pg)
+        Some(tid) if is_admin => UserRepo::resolve_all_menu_perms(&state.pg, tid)
             .await
             .into_internal()
             .inspect(|p| {
                 tracing::debug!(
-                    tenant = %tid,
-                    count = p.len(),
-                    "admin user granted all menu permissions"
+                    tenant_id = %tid,
+                    perm_count = p.len(),
+                    "admin user granted package-scoped menu permissions"
                 );
             })?,
         Some(tid) => UserRepo::resolve_role_permissions(&state.pg, &user.user_id, tid)

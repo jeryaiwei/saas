@@ -340,10 +340,12 @@ impl UserRepo {
     }
 
     /// Resolve permissions for a **non-admin** user by joining
-    /// user → role → role-menu → menu.
+    /// user → role → role-menu → menu, filtered by the tenant's package
+    /// menu scope. Menus outside the tenant's `sys_tenant_package.menu_ids`
+    /// are excluded — even if the user's role grants access to them.
     ///
-    /// NestJS additionally intersects with `SysTenantPackage.menuIds` for the
-    /// current tenant — Phase 2 of the Rust port will implement that filter.
+    /// If the tenant has no package (`package_id IS NULL`), all menus
+    /// are allowed (same NestJS behavior: `p.menu_ids IS NULL` branch).
     #[tracing::instrument(skip_all, fields(user_id = %user_id, tenant_id = %tenant_id))]
     pub async fn resolve_role_permissions(
         pool: &PgPool,
@@ -356,11 +358,16 @@ impl UserRepo {
               JOIN sys_role_menu rm ON rm.menu_id = m.menu_id
               JOIN sys_user_role ur ON ur.role_id = rm.role_id
               JOIN sys_role r       ON r.role_id = ur.role_id
+              LEFT JOIN sys_tenant t ON t.tenant_id = $2
+                AND t.del_flag = '0'
+              LEFT JOIN sys_tenant_package p ON t.package_id = p.package_id
+                AND p.del_flag = '0' AND p.status = '0'
              WHERE ur.user_id = $1
                AND r.tenant_id = $2
                AND r.status = '0' AND r.del_flag = '0'
                AND m.status = '0' AND m.del_flag = '0'
                AND m.perms <> ''
+               AND (p.menu_ids IS NULL OR m.menu_id = ANY(p.menu_ids))
         "#;
         let rows: Vec<(String,)> = sqlx::query_as(sql)
             .bind(user_id)
@@ -371,22 +378,30 @@ impl UserRepo {
         Ok(rows.into_iter().map(|(p,)| p).collect())
     }
 
-    /// Return every non-empty menu permission in the system. Used for admin
-    /// users (NestJS short-circuits role checks when `SysUserTenant.isAdmin
-    /// = '1'` and grants the full tenant-package menu range).
+    /// Return menu permissions for an **admin** user, scoped to the
+    /// tenant's package. Admin users get ALL permissions within their
+    /// tenant's package range — not limited by roles.
     ///
-    /// **Phase 0 simplification**: this does NOT intersect with
-    /// `SysTenantPackage.menuIds`. Admin users in a restricted-package tenant
-    /// would therefore be over-granted. Phase 2 will add the package filter.
-    #[tracing::instrument(skip_all)]
-    pub async fn resolve_all_menu_perms(pool: &PgPool) -> anyhow::Result<Vec<String>> {
+    /// If the tenant has no package (`package_id IS NULL`), all menus
+    /// are returned (no restriction). This matches NestJS behavior.
+    #[tracing::instrument(skip_all, fields(tenant_id = %tenant_id))]
+    pub async fn resolve_all_menu_perms(
+        pool: &PgPool,
+        tenant_id: &str,
+    ) -> anyhow::Result<Vec<String>> {
         let sql = r#"
-            SELECT DISTINCT perms
-              FROM sys_menu
-             WHERE status = '0' AND del_flag = '0'
-               AND perms <> ''
+            SELECT DISTINCT m.perms
+              FROM sys_menu m
+              LEFT JOIN sys_tenant t ON t.tenant_id = $1
+                AND t.del_flag = '0'
+              LEFT JOIN sys_tenant_package p ON t.package_id = p.package_id
+                AND p.del_flag = '0' AND p.status = '0'
+             WHERE m.status = '0' AND m.del_flag = '0'
+               AND m.perms <> ''
+               AND (p.menu_ids IS NULL OR m.menu_id = ANY(p.menu_ids))
         "#;
         let rows: Vec<(String,)> = sqlx::query_as(sql)
+            .bind(tenant_id)
             .fetch_all(pool)
             .await
             .context("resolve_all_menu_perms")?;
