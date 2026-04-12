@@ -168,6 +168,27 @@ pub struct SysTenantPackage {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysDept {
+    pub dept_id: String,
+    pub tenant_id: String,
+    pub parent_id: Option<String>,
+    pub ancestors: Vec<String>,
+    pub dept_name: String,
+    pub order_num: i32,
+    pub leader: String,
+    pub phone: String,
+    pub email: String,
+    pub status: String,
+    pub del_flag: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+    pub i18n: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
 pub struct SysMenu {
     pub menu_id: String,
     pub menu_name: String,

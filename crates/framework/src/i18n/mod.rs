@@ -246,6 +246,9 @@ mod tests {
             ResponseCode::TENANT_PACKAGE_NAME_EXISTS,
             ResponseCode::TENANT_PACKAGE_IN_USE,
             // 7000-7099 system module
+            ResponseCode::DEPT_NOT_FOUND,
+            ResponseCode::DEPT_PARENT_NOT_FOUND,
+            ResponseCode::DEPT_NESTING_TOO_DEEP,
             ResponseCode::MENU_NOT_FOUND,
         ];
 

@@ -1,4 +1,4 @@
-# Tea-SaaS 分页索引契约
+# SaaS 分页索引契约
 
 **状态**：v1.0（2026-04-11 首次发布）
 **关联规范**：`docs/framework-pagination-spec.md` §5
@@ -25,6 +25,7 @@
 **端点**：`GET /system/user/list`
 **目标表**：`sys_user u JOIN sys_user_tenant ut`
 **SQL 形态**：
+
 ```sql
 SELECT u.* FROM sys_user u
 JOIN sys_user_tenant ut ON ut.user_id = u.user_id
@@ -43,13 +44,13 @@ LIMIT $8 OFFSET $9;
 
 ### 期望索引
 
-| 索引 | 列 | 用途 | Migration | 状态 |
-|---|---|---|---|---|
-| `pk_sys_user` | `user_id` | JOIN 主键 | 初始化 schema | ✅ 存在（主键） |
-| `pk_sys_user_tenant` | `id` | JOIN 主键 | 初始化 schema | ✅ 存在（主键） |
-| `idx_sys_user_tenant_user_id` | `sys_user_tenant(user_id)` | JOIN on `ut.user_id = u.user_id` | 初始化 schema | ⚠️ 假定存在，需 `\d+ sys_user_tenant` 确认 |
-| `idx_sys_user_tenant_tenant_status` | `sys_user_tenant(tenant_id, status)` | 租户过滤 + 状态过滤 | ⚠️ **待创建** | ❌ 未验证 |
-| `idx_sys_user_create_at_del` | `sys_user(create_at DESC) WHERE del_flag = '0'` | 排序 + soft delete | ⚠️ **待创建**（partial index） | ❌ 未验证 |
+| 索引                                | 列                                              | 用途                             | Migration                      | 状态                                       |
+| ----------------------------------- | ----------------------------------------------- | -------------------------------- | ------------------------------ | ------------------------------------------ |
+| `pk_sys_user`                       | `user_id`                                       | JOIN 主键                        | 初始化 schema                  | ✅ 存在（主键）                            |
+| `pk_sys_user_tenant`                | `id`                                            | JOIN 主键                        | 初始化 schema                  | ✅ 存在（主键）                            |
+| `idx_sys_user_tenant_user_id`       | `sys_user_tenant(user_id)`                      | JOIN on `ut.user_id = u.user_id` | 初始化 schema                  | ⚠️ 假定存在，需 `\d+ sys_user_tenant` 确认 |
+| `idx_sys_user_tenant_tenant_status` | `sys_user_tenant(tenant_id, status)`            | 租户过滤 + 状态过滤              | ⚠️ **待创建**                  | ❌ 未验证                                  |
+| `idx_sys_user_create_at_del`        | `sys_user(create_at DESC) WHERE del_flag = '0'` | 排序 + soft delete               | ⚠️ **待创建**（partial index） | ❌ 未验证                                  |
 
 ### 缺失时降级行为
 
@@ -75,6 +76,7 @@ LIMIT $8 OFFSET $9;
 **端点**：`GET /system/role/list`
 **目标表**：`sys_role`
 **SQL 形态**：
+
 ```sql
 SELECT * FROM sys_role
 WHERE del_flag = '0'
@@ -88,9 +90,9 @@ LIMIT $5 OFFSET $6;
 
 ### 期望索引
 
-| 索引 | 列 | 用途 | Migration | 状态 |
-|---|---|---|---|---|
-| `pk_sys_role` | `role_id` | 主键 | 初始化 schema | ✅ 存在 |
+| 索引                              | 列                                                              | 用途                   | Migration                      | 状态      |
+| --------------------------------- | --------------------------------------------------------------- | ---------------------- | ------------------------------ | --------- |
+| `pk_sys_role`                     | `role_id`                                                       | 主键                   | 初始化 schema                  | ✅ 存在   |
 | `idx_sys_role_tenant_status_sort` | `sys_role(tenant_id, status, role_sort)` WHERE `del_flag = '0'` | 租户过滤 + 状态 + 排序 | ⚠️ **待创建**（partial index） | ❌ 未验证 |
 
 ### 缺失时降级行为
@@ -109,6 +111,7 @@ LIMIT $5 OFFSET $6;
 **端点**：`GET /system/role/auth-user/allocated-list`
 **目标表**：`sys_user u JOIN sys_user_role ur JOIN sys_user_tenant ut`
 **SQL 形态**：
+
 ```sql
 SELECT u.* FROM sys_user u
 JOIN sys_user_role ur ON ur.user_id = u.user_id
@@ -124,11 +127,11 @@ LIMIT $4 OFFSET $5;
 
 ### 期望索引
 
-| 索引 | 列 | 用途 | Migration | 状态 |
-|---|---|---|---|---|
-| `pk_sys_user_role` | `(user_id, role_id)` | 复合主键 | 初始化 schema | ✅ 假定存在 |
-| `idx_sys_user_role_role_id` | `sys_user_role(role_id)` | 反向 JOIN `ur.role_id = $1` | ⚠️ **待创建** | ❌ 未验证 |
-| 同 §1 的 sys_user 索引 | | | | |
+| 索引                        | 列                       | 用途                        | Migration     | 状态        |
+| --------------------------- | ------------------------ | --------------------------- | ------------- | ----------- |
+| `pk_sys_user_role`          | `(user_id, role_id)`     | 复合主键                    | 初始化 schema | ✅ 假定存在 |
+| `idx_sys_user_role_role_id` | `sys_user_role(role_id)` | 反向 JOIN `ur.role_id = $1` | ⚠️ **待创建** | ❌ 未验证   |
+| 同 §1 的 sys_user 索引      |                          |                             |               |             |
 
 ### 缺失时降级行为
 
@@ -146,6 +149,7 @@ LIMIT $4 OFFSET $5;
 **端点**：`GET /system/role/auth-user/unallocated-list`
 **目标表**：`sys_user u JOIN sys_user_tenant ut LEFT ANTI JOIN sys_user_role ur`
 **SQL 形态**：
+
 ```sql
 SELECT u.* FROM sys_user u
 JOIN sys_user_tenant ut ON ut.user_id = u.user_id
@@ -163,10 +167,10 @@ LIMIT $4 OFFSET $5;
 
 ### 期望索引
 
-| 索引 | 列 | 用途 | Migration | 状态 |
-|---|---|---|---|---|
-| `idx_sys_user_role_user_role` | `sys_user_role(user_id, role_id)` | 反半连接加速 `NOT EXISTS` | ⚠️ 复合主键应已覆盖 | ⚠️ 假定存在 |
-| 同 §1 的 sys_user / sys_user_tenant 索引 | | | | |
+| 索引                                     | 列                                | 用途                      | Migration           | 状态        |
+| ---------------------------------------- | --------------------------------- | ------------------------- | ------------------- | ----------- |
+| `idx_sys_user_role_user_role`            | `sys_user_role(user_id, role_id)` | 反半连接加速 `NOT EXISTS` | ⚠️ 复合主键应已覆盖 | ⚠️ 假定存在 |
+| 同 §1 的 sys_user / sys_user_tenant 索引 |                                   |                           |                     |             |
 
 ### 缺失时降级行为
 

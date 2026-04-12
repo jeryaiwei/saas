@@ -1,4 +1,4 @@
-# Tea-SaaS 分页框架规范 v1.0
+# SaaS 分页框架规范 v1.0
 
 **生效日期**：2026-04-11
 **状态**：Normative（规范性）
@@ -13,11 +13,13 @@
 ## 0. 适用范围
 
 **规范覆盖**：
+
 - 所有返回列表数据的 HTTP 端点
 - 所有接受分页参数的 DAO 方法
 - 框架层的分页 primitive：`PageQuery` / `PaginationParams` / `Page<T>`
 
 **规范不覆盖**：
+
 - Cursor / keyset 分页（将来的独立 primitive，见 §11 Phase 3）
 - 流式 / 导出类端点（走独立 `ExportQuery` 契约，见 §11 Phase 3.2）
 - 单行读（`find_by_id` 等）
@@ -54,12 +56,14 @@ pub struct PageQuery {
 ```
 
 **契约**：
+
 - **必须** 用 `#[serde(flatten)]` + `#[validate(nested)]` 嵌入到每个 ListDto，wire 格式保持平铺 `{..., pageNum, pageSize}`
 - **必须** 由 `ValidatedQuery` extractor 驱动校验，**不应** 在 service 层重复校验
 - **不得** 为 page_num/page_size 定义字面量上限，必须引用 `PAGE_NUM_MAX` / `PAGE_SIZE_MAX` 常量
 - **不得** 被克隆（无 `Clone` derive）
 
 **常量（单一真源）**：
+
 ```rust
 pub const PAGE_NUM_MAX: u32 = 10_000;
 pub const PAGE_NUM_DEFAULT: u32 = 1;
@@ -87,6 +91,7 @@ impl PaginationParams {
 ```
 
 **契约**：
+
 - **必须** 只在 DAO 层构造，service 层**不得** 持有或传递
 - **必须** 保持 `Copy` 语义（16 字节 POD，降低调用方心智负担）
 - **必须** 作为防御式 clamp 的唯一执行点（validator 的 HTTP 层 clamp 是第一道闸门，`PaginationParams::from` 是第二道，两道缺一不可）
@@ -107,6 +112,7 @@ pub struct Page<T> {
 ```
 
 **契约**：
+
 - 字段序列化顺序和名称**必须** 与 NestJS `Result.page()` 一致
 - **不得** 被克隆（无 `Clone` derive）
 - **必须** 通过 `Page::new` 或 `PaginationParams::into_page` 构造，**不得** 使用字段字面量直接构造（防止 `pages` 字段计算错位）
@@ -129,6 +135,7 @@ pub struct UserListFilter {
 ```
 
 **契约**：
+
 - **必须** 使用 owned 类型（`String`, `Option<String>`, `Vec<String>`, `PageQuery`），不得带 `'a` 生命周期
 - **必须** 嵌入 `PageQuery`（而非 `page_num: u32, page_size: u32` 两字段）
 - **必须** 在同一 `_repo.rs` 文件内声明（紧邻消费它的方法）
@@ -142,12 +149,12 @@ pub struct UserListFilter {
 
 ## 3. 分层责任
 
-| 层 | 持有类型 | 职责 | 不得做 |
-|---|---|---|---|
-| **Wire / extractor** | `ListDto` (含 `PageQuery`) | serde 反序列化、validator 校验、i18n 错误翻译 | 业务判断、SQL、tenant 注入 |
-| **Handler** | `ValidatedQuery<ListDto>`, `State<AppState>` | 调 service、包 `ApiResponse::ok` | 持有 repo 引用、调 DB、做 mapping |
-| **Service** | `ListDto`, `Filter` | 构造 filter、跨 repo 协调、权限判定 | 手写 SQL、验证分页边界（validator 已做） |
-| **Repo** | `Filter`, `PaginationParams` | SQL 构造、bind、clamp 兜底、post-condition 断言、tracing | 调另一个 repo、越层读 DTO 类型、违反 index 契约 |
+| 层                   | 持有类型                                     | 职责                                                     | 不得做                                          |
+| -------------------- | -------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------- |
+| **Wire / extractor** | `ListDto` (含 `PageQuery`)                   | serde 反序列化、validator 校验、i18n 错误翻译            | 业务判断、SQL、tenant 注入                      |
+| **Handler**          | `ValidatedQuery<ListDto>`, `State<AppState>` | 调 service、包 `ApiResponse::ok`                         | 持有 repo 引用、调 DB、做 mapping               |
+| **Service**          | `ListDto`, `Filter`                          | 构造 filter、跨 repo 协调、权限判定                      | 手写 SQL、验证分页边界（validator 已做）        |
+| **Repo**             | `Filter`, `PaginationParams`                 | SQL 构造、bind、clamp 兜底、post-condition 断言、tracing | 调另一个 repo、越层读 DTO 类型、违反 index 契约 |
 
 **严格禁止**：repo 导入 `system::*::dto::*Dto`（即使是 list 的只读路径），DAO isolation 是硬边界。
 
@@ -171,6 +178,7 @@ pub struct ListUserDto {
 ```
 
 **规则**：
+
 - **必须** derive `Debug, Deserialize, Validate`
 - **不得** derive `Clone`、`Serialize`
 - **必须** 用 `#[serde(rename_all = "camelCase")]`
@@ -206,6 +214,7 @@ pub async fn list(
 ```
 
 **规则**：
+
 - **必须** 用显式字段 literal 构造 filter，**不得** 使用 `impl From<ListDto> for Filter`（禁止隐藏 mapping）
 - **必须** 用 `into_internal()` 把 `anyhow::Error` 转 `AppError::Internal`
 - **必须** 用 `page.map_rows(...)` 做实体→响应 DTO 转换
@@ -214,7 +223,7 @@ pub async fn list(
 
 ### 4.3 Repo 层 `find_page` 方法
 
-````rust
+```rust
 /// Paginated list of users in the current tenant.
 ///
 /// ## Expected indexes
@@ -271,9 +280,10 @@ pub async fn find_page(
 
     Ok(p.into_page(rows, total))
 }
-````
+```
 
 **规则**：
+
 - **必须** 有一段 doc comment 包含三个 section：`## Expected indexes`、`## Consistency caveats`、`## Performance expectation`
 - **必须** 用 `#[tracing::instrument]` 标注 `tenant_id`、`page_num`、`page_size`、`rows_len`、`total`（5 个标准字段，`tenant_id/rows_len/total` 用 `field::Empty` 延迟填充）
 - **必须** 用 `PaginationParams::from(...)` 而不是裸 `safe_page_num.max(1)` 计算
@@ -301,6 +311,7 @@ let count_sql = format!("SELECT COUNT(*) FROM sys_user u JOIN ... {USER_PAGE_WHE
 ```
 
 **规则**：
+
 - **必须** 把 WHERE 提取成 `const`，rows 和 count SQL 都 `format!` 进去
 - 这样消灭 rows 和 count WHERE 漂移（常见 bug：给 rows 加了新过滤条件，忘了同步 count）
 
@@ -317,6 +328,7 @@ let count_sql = format!("SELECT COUNT(*) FROM sys_user u JOIN ... {USER_PAGE_WHE
 **必须** 维护一份 `docs/framework-pagination-indexes.md` 作为**全局真源**，列出每个 `find_page` 对应的索引名、创建它的 migration 文件、以及**索引缺失时的降级行为**。
 
 **规则**：
+
 - 新增 `find_page` 必须同步更新这份文档
 - 每个索引必须有对应的 migration（不得依赖"生产手动建索引"）
 - CI **应当** 有一个 regression 测试跑 `EXPLAIN (FORMAT JSON)` 并通过 `framework::testing::explain_plan::check_no_seq_scan` assert 计划里没有对核心表的 `Seq Scan`。helper 已在 v1.1 落地（2026-04-11），但**实际挂到具体 `find_page` 的 regression test 推迟到 v1.2**——当前 dev DB 行数太少，Postgres planner 会优先选 seq scan 而非 index，先挂测试会稳定误报。等种子数据就位再启用。
@@ -333,13 +345,13 @@ let count_sql = format!("SELECT COUNT(*) FROM sys_user u JOIN ... {USER_PAGE_WHE
 
 ### 6.1 标准字段（每个 `find_page` 必须发出）
 
-| 字段 | 类型 | 来源 | 用途 |
-|---|---|---|---|
-| `tenant_id` | Option<String> | `current_tenant_scope()` | 按租户分组性能 |
-| `page_num` | u32 | `filter.page.page_num` | 翻页深度 |
-| `page_size` | u32 | `filter.page.page_size` | 批量大小 |
-| `rows_len` | u64 | 结果集 | 实际返回行数（≠ page_size 即尾页） |
-| `total` | i64 | COUNT query | 总行数（用于检测深翻页无效请求） |
+| 字段        | 类型           | 来源                     | 用途                               |
+| ----------- | -------------- | ------------------------ | ---------------------------------- |
+| `tenant_id` | Option<String> | `current_tenant_scope()` | 按租户分组性能                     |
+| `page_num`  | u32            | `filter.page.page_num`   | 翻页深度                           |
+| `page_size` | u32            | `filter.page.page_size`  | 批量大小                           |
+| `rows_len`  | u64            | 结果集                   | 实际返回行数（≠ page_size 即尾页） |
+| `total`     | i64            | COUNT query              | 总行数（用于检测深翻页无效请求）   |
 
 **必须** 通过 `#[tracing::instrument(fields(...))]` 声明，**不得** 只在函数体内用 `tracing::info!`。
 
@@ -361,6 +373,7 @@ let count_sql = format!("SELECT COUNT(*) FROM sys_user u JOIN ... {USER_PAGE_WHE
 `ValidatedQuery` → `validator::Validate::validate` → `AppError::Validation` → 400 响应。
 
 **必须** 用 `valid.range` i18n key 作为默认错误消息：
+
 ```json
 "valid.range": "字段值超出允许范围（应在 {min} 到 {max} 之间）"
 ```
@@ -390,6 +403,7 @@ Offset 分页**不是** snapshot-consistent：
 3. **Race C 过滤变化导致错位**：并发修改使行跨页移动
 
 **v1 的态度**：
+
 - 所有 list 端点**应当** 用二级排序键 `ORDER BY <主键> DESC, <id> DESC` 消除 ties 导致的 Race A 子集
 - **不应** 依赖 `REPEATABLE READ` tx 隔离（跨请求无意义，单请求性能差）
 - 前端**应当** 在翻页期间显示 "数据可能已更新，建议刷新"（产品层协议，非框架职责）
@@ -411,6 +425,7 @@ Offset 分页**不是** snapshot-consistent：
 `Page<T>.total: u64` 暴露的语义是"当前 filter 条件下的精确行数"。在多租户系统中这是**已知的信息泄露面**。
 
 **v1 的态度**：
+
 - 所有 list 端点**必须** 走 RBAC / tenant-scope guard，阻止未授权调用
 - **不得** 把 `total` 当作敏感数据保护——它是设计上的 wire 契约一部分
 - 需要真正隐藏总数的场景**必须** 等 §11 Phase 2 的 `HasMore` 模式上线
@@ -432,31 +447,31 @@ Offset 分页**不是** snapshot-consistent：
 
 ## 10. 禁止模式
 
-| 模式 | 为什么禁止 | 替代方案 |
-|---|---|---|
-| `impl From<ListUserDto> for UserListFilter` | 隐藏字段 mapping | 显式字段 literal 构造 |
-| `find_page(pool, page_num, page_size, ...)` 位置参数 | 参数爆炸；没有 filter struct 就没有 DAO 隔离 | 定义 `XxxListFilter` struct |
-| `Page::new(rows, total as u64, ...)` 散落 | cast 散落；绕过 `into_page` 无法统一未来演化 | 只用 `p.into_page(rows, total)` |
-| 在 repo 里调另一个 repo | 破坏 DAO rule 2 | service 层协调 |
-| filter struct 带 `Clone` derive | 0 调用点的无用 derive | 只 derive `Debug` |
-| `#[serde(rename_all = ...)]` 不一致 | wire 形状漂移 | 统一 `camelCase` |
-| rows SQL 和 count SQL 的 WHERE 手写两份 | 漂移风险 | 提取 `const WHERE_SQL` |
-| `paginate_with_tracing` / `ListQuery<F,S,P>` 泛型包装 | < 6 调用点时过度抽象 | 手写，复制到阈值 |
-| `total: 0` + 非空 rows 作为"软错误" | 语义崩坏 | `debug_assert!(rows.len() as i64 <= total)` |
-| 硬编码页面上限（`.clamp(1, 200)`） | 双源头漂移 | 用 `PAGE_SIZE_MAX` 常量 |
+| 模式                                                  | 为什么禁止                                   | 替代方案                                    |
+| ----------------------------------------------------- | -------------------------------------------- | ------------------------------------------- |
+| `impl From<ListUserDto> for UserListFilter`           | 隐藏字段 mapping                             | 显式字段 literal 构造                       |
+| `find_page(pool, page_num, page_size, ...)` 位置参数  | 参数爆炸；没有 filter struct 就没有 DAO 隔离 | 定义 `XxxListFilter` struct                 |
+| `Page::new(rows, total as u64, ...)` 散落             | cast 散落；绕过 `into_page` 无法统一未来演化 | 只用 `p.into_page(rows, total)`             |
+| 在 repo 里调另一个 repo                               | 破坏 DAO rule 2                              | service 层协调                              |
+| filter struct 带 `Clone` derive                       | 0 调用点的无用 derive                        | 只 derive `Debug`                           |
+| `#[serde(rename_all = ...)]` 不一致                   | wire 形状漂移                                | 统一 `camelCase`                            |
+| rows SQL 和 count SQL 的 WHERE 手写两份               | 漂移风险                                     | 提取 `const WHERE_SQL`                      |
+| `paginate_with_tracing` / `ListQuery<F,S,P>` 泛型包装 | < 6 调用点时过度抽象                         | 手写，复制到阈值                            |
+| `total: 0` + 非空 rows 作为"软错误"                   | 语义崩坏                                     | `debug_assert!(rows.len() as i64 <= total)` |
+| 硬编码页面上限（`.clamp(1, 200)`）                    | 双源头漂移                                   | 用 `PAGE_SIZE_MAX` 常量                     |
 
 ---
 
 ## 11. 演化路线
 
-| Phase | 内容 | 触发条件 | 预估成本 |
-|---|---|---|---|
-| **v1.0**（本规范） | Filter 嵌 PageQuery、into_page 接 i64、常量单源头、doc comment 标准化 | 立即 | ~250 LOC |
-| **v1.1** | `with_timeout` helper、slow query warn、i18n 参数化（`get_by_key_with_json_params`）、post-condition runtime truncate、`reconcile_total`、`check_no_seq_scan` / `assert_index_exists` 测试 helper | ✅ 2026-04-11 已实施 | 实际 ~450 LOC |
-| **v2.0** | `Page.total: Option<u64>` + `has_more` + `HasMore` 模式 | 出现信息泄露审计或 C 端 feed 需求 | wire break + 前端适配 |
-| **v3.0** | Cursor pagination primitive（`CursorQuery<C>` / `CursorPage<T>`） | 深翻页 p99 > 1s 或 export 需求 | 独立一周 |
-| **v3.1** | Sort framework（`SortQuery` + `SortableList` trait + 列白名单） | 产品提出用户可选排序列需求 | ~3 天 |
-| **v3.2** | `ExportQuery` + 流式响应（突破 `PAGE_SIZE_MAX`） | 后台导出超 10k 行需求 | 独立一周 |
+| Phase              | 内容                                                                                                                                                                                              | 触发条件                          | 预估成本              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | --------------------- |
+| **v1.0**（本规范） | Filter 嵌 PageQuery、into_page 接 i64、常量单源头、doc comment 标准化                                                                                                                             | 立即                              | ~250 LOC              |
+| **v1.1**           | `with_timeout` helper、slow query warn、i18n 参数化（`get_by_key_with_json_params`）、post-condition runtime truncate、`reconcile_total`、`check_no_seq_scan` / `assert_index_exists` 测试 helper | ✅ 2026-04-11 已实施              | 实际 ~450 LOC         |
+| **v2.0**           | `Page.total: Option<u64>` + `has_more` + `HasMore` 模式                                                                                                                                           | 出现信息泄露审计或 C 端 feed 需求 | wire break + 前端适配 |
+| **v3.0**           | Cursor pagination primitive（`CursorQuery<C>` / `CursorPage<T>`）                                                                                                                                 | 深翻页 p99 > 1s 或 export 需求    | 独立一周              |
+| **v3.1**           | Sort framework（`SortQuery` + `SortableList` trait + 列白名单）                                                                                                                                   | 产品提出用户可选排序列需求        | ~3 天                 |
+| **v3.2**           | `ExportQuery` + 流式响应（突破 `PAGE_SIZE_MAX`）                                                                                                                                                  | 后台导出超 10k 行需求             | 独立一周              |
 
 **触发器表是 governance 工具**：任何人看到 "我觉得该加 cursor 了" 的冲动时，先对照这张表——如果触发条件没满足，**不加**。
 
@@ -465,6 +480,7 @@ Offset 分页**不是** snapshot-consistent：
 ## 12. 新增 list 端点的样板
 
 **Step 1 — DTO**（`system/<module>/dto.rs`）
+
 ```rust
 #[derive(Debug, Deserialize, Validate)]
 #[serde(rename_all = "camelCase")]
@@ -478,6 +494,7 @@ pub struct ListXxxDto {
 ```
 
 **Step 2 — Filter**（`domain/<module>_repo.rs` 顶部）
+
 ```rust
 #[derive(Debug)]
 pub struct XxxListFilter {
@@ -489,6 +506,7 @@ pub struct XxxListFilter {
 ```
 
 **Step 3 — WHERE 单源**
+
 ```rust
 const XXX_PAGE_WHERE: &str = "\
     WHERE del_flag = '0' \

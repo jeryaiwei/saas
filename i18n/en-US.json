@@ -26,6 +26,9 @@
   "4021": "Package code already exists",
   "4022": "Package name already exists",
   "4023": "Cannot delete package in use by tenants",
+  "7010": "Department not found",
+  "7014": "Parent department not found",
+  "7015": "Department nesting level exceeded",
   "7020": "Menu not found",
 
   "valid.length": "Field length out of range",

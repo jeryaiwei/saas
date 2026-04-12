@@ -62,6 +62,9 @@ impl ResponseCode {
     pub const TENANT_PACKAGE_IN_USE: Self = Self(4023);
 
     // --- 7000-7099 system module ---
+    pub const DEPT_NOT_FOUND: Self = Self(7010);
+    pub const DEPT_PARENT_NOT_FOUND: Self = Self(7014);
+    pub const DEPT_NESTING_TOO_DEEP: Self = Self(7015);
     pub const MENU_NOT_FOUND: Self = Self(7020);
 
     pub const fn as_i32(self) -> i32 {

@@ -1,4 +1,4 @@
-# Tea-SaaS 错误与响应包络框架规范 v1.0
+# SaaS 错误与响应包络框架规范 v1.0
 
 **生效日期**：2026-04-11
 **状态**：Normative（规范性）
@@ -15,6 +15,7 @@
 ## 0. 适用范围
 
 **规范覆盖**：
+
 - 所有 HTTP 响应体（成功 + 所有错误分支）的 wire 形状和字段名
 - `AppError` 的所有 variant 及其构造路径
 - `ResponseCode` 的编号段和注册流程
@@ -23,6 +24,7 @@
 - Service 层错误扩展 trait（`IntoAppError`、`BusinessCheckOption`、`BusinessCheckBool`）
 
 **规范不覆盖**：
+
 - 分页响应的数据结构（见 `docs/framework-pagination-spec.md`）
 - Cursor 分页（v3.0，独立 primitive）
 - 流式响应 / SSE / WebSocket（独立 primitive）
@@ -60,6 +62,7 @@ pub struct ApiResponse<T> {
 ```
 
 **契约**：
+
 - **必须** 是整个应用**唯一**的 HTTP 响应 body 结构体；成功路径和错误路径都必须序列化为这个形状
 - **不得** 另外定义 `ErrorBody` 或等价的 "错误专用" struct（v0 有这个重复，v1.0 必须合并，见 §12 gap）
 - **必须** `camelCase` 序列化；字段名严格为 `code` / `msg` / `data` / `requestId` / `timestamp`
@@ -112,6 +115,7 @@ pub enum AppError {
 ```
 
 **契约**：
+
 - 五个 variant 是**完整的 closed set**——新增 variant 必须修订本规范
 - **必须** 保持 `#[derive(Debug, thiserror::Error)]`，**不得** 手写 `impl Error`
 - **必须** 通过 `AppError::business(code)` / `AppError::auth(code)` / `AppError::forbidden(code)` 构造业务错误变体，**不得** 用字段 literal
@@ -132,6 +136,7 @@ pub struct FieldError {
 ```
 
 **契约**：
+
 - **必须** 是 `AppError::Validation { errors: Vec<FieldError> }` 的唯一明细项类型
 - **必须** 只在 framework crate 内构造（extractors + error::IntoResponse），**不得** 由 modules / app 层构造
 - `field` 格式见 §7.1 规范
@@ -148,6 +153,7 @@ pub struct ResponseCode(pub i32);
 ```
 
 **契约**：
+
 - **必须** 是 newtype，**不得** 改成 enum（扩展性：新增常量不触发 exhaustive match）
 - **必须** `#[serde(transparent)]` 使 JSON 编码为原始数字而非 `{"0": 200}` 包装
 - `as_i32()` 和 `is_success()` 是唯一允许的观察函数
@@ -180,6 +186,7 @@ pub struct ResponseCode(pub i32);
 ```
 
 **规则**：
+
 - **必须** 严格按段位分配新常量，跨段借用一律拒绝
 - **必须** 在本文档 §2.6 同步记录新段位，PR 必须同时更新本规范
 - **必须** 在 `framework/src/response/codes.rs` 文件内顶部的编号注释里标注段位
@@ -191,15 +198,16 @@ pub struct ResponseCode(pub i32);
 
 ## 3. 分层责任
 
-| 层 | 持有类型 | 职责 | 不得做 |
-|---|---|---|---|
-| **Handler** | `ApiResponse<T>`、`AppError` | 返回 `Result<ApiResponse<T>, AppError>`，出错时 `?` 传播 | 自己包装 `Json(...)`、自己选 status code、自己拼 wire shape |
-| **Service** | `Result<_, AppError>` | 用 `IntoAppError::into_internal()` / `BusinessCheckOption::or_business()` / `BusinessCheckBool::business_err_if()` 扩展 trait 做显式错误转换 | 用 `?` 把 anyhow 隐式转 AppError（v1.0 后 `#[from]` 会被移除） |
-| **Repo** | `anyhow::Result<_>` | 只返 `anyhow::Error`，上下文通过 `.context(...)` 附加 | 返回 `AppError`、构造业务错误、感知 HTTP 状态码 |
-| **Framework (AppError)** | `AppError::IntoResponse` | 把 AppError 转成 `ApiResponse<Value>`，查 i18n，走统一序列化 | 暴露两份 wire struct、自己选 camelCase 规则、绕过 RequestContext |
-| **Framework (extractors)** | `ValidatedJson` / `ValidatedQuery` | 把 `ValidationErrors` 映射成 `AppError::Validation { Vec<FieldError> }` | 放行未校验的数据、调 service/repo |
+| 层                         | 持有类型                           | 职责                                                                                                                                         | 不得做                                                           |
+| -------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Handler**                | `ApiResponse<T>`、`AppError`       | 返回 `Result<ApiResponse<T>, AppError>`，出错时 `?` 传播                                                                                     | 自己包装 `Json(...)`、自己选 status code、自己拼 wire shape      |
+| **Service**                | `Result<_, AppError>`              | 用 `IntoAppError::into_internal()` / `BusinessCheckOption::or_business()` / `BusinessCheckBool::business_err_if()` 扩展 trait 做显式错误转换 | 用 `?` 把 anyhow 隐式转 AppError（v1.0 后 `#[from]` 会被移除）   |
+| **Repo**                   | `anyhow::Result<_>`                | 只返 `anyhow::Error`，上下文通过 `.context(...)` 附加                                                                                        | 返回 `AppError`、构造业务错误、感知 HTTP 状态码                  |
+| **Framework (AppError)**   | `AppError::IntoResponse`           | 把 AppError 转成 `ApiResponse<Value>`，查 i18n，走统一序列化                                                                                 | 暴露两份 wire struct、自己选 camelCase 规则、绕过 RequestContext |
+| **Framework (extractors)** | `ValidatedJson` / `ValidatedQuery` | 把 `ValidationErrors` 映射成 `AppError::Validation { Vec<FieldError> }`                                                                      | 放行未校验的数据、调 service/repo                                |
 
 **严格禁止**：
+
 - Handler 直接构造 `Json(...)` 或任何 `IntoResponse` impl（除 `ApiResponse<T>` 和 `AppError` 之外）
 - Repo 把 `AppError` 当返回值
 - Service 用 `?` 把 repo 的 `anyhow::Error` 隐式升级为 `AppError::Internal`（v1.0 强制显式 `.into_internal()`）
@@ -222,6 +230,7 @@ async fn create_user(
 ```
 
 **规则**：
+
 - **必须** 返回类型为 `Result<ApiResponse<T>, AppError>`，T 为响应 DTO
 - **必须** 用 `ApiResponse::ok(data)` 或 `ApiResponse::success()` 构造成功响应
 - **必须** 用 `?` 传播 `AppError`，**不得** 匹配错误后手工转换
@@ -256,6 +265,7 @@ pub async fn create(state: &AppState, dto: CreateUserDto) -> Result<UserDetailRe
 ```
 
 **规则**：
+
 - **必须** 对每一个 `anyhow::Result` 返回的调用显式 `.into_internal()`
 - **必须** 用 `BusinessCheckOption::or_business(code)` 处理 `Option::None` → 业务错误
 - **必须** 用 `BusinessCheckBool::business_err_if(code)` 处理布尔值 → 业务错误
@@ -278,6 +288,7 @@ pub async fn find_by_id(pool: &PgPool, user_id: &str) -> anyhow::Result<Option<S
 ```
 
 **规则**：
+
 - **必须** 返回 `anyhow::Result<T>`，**不得** 返回 `Result<T, AppError>` 或 `Result<T, sqlx::Error>`
 - **必须** 对每个 sqlx 调用链末尾加 `.context("<方法名>: <动作>")`
 - **不得** 在 repo 内调用 `.into_internal()` 或感知 `AppError`
@@ -310,12 +321,13 @@ i18n key 的**命名空间**严格分为两类，互不相交：
 
 ```json
 {
-    "2003": "账号已锁定，请 {minutes} 分钟后重试",
-    "valid.range": "字段值超出允许范围（应在 {min} 到 {max} 之间）"
+  "2003": "账号已锁定，请 {minutes} 分钟后重试",
+  "valid.range": "字段值超出允许范围（应在 {min} 到 {max} 之间）"
 }
 ```
 
 **规则**：
+
 - 占位符格式**必须** 为 `{name}`，和 NestJS `i18next` 保持一致
 - **必须** 使用 `snake_case` 或 camelCase 单个标识符作为占位符名（`{minutes}`、`{minRole}`，**不得** 用 `{min-role}` 或 `{min role}`）
 - ✅ **v1.1 已实施**（2026-04-11）：validator 的 `range` 等约束带 `{min}` / `{max}` / `{value}` 占位符时，在 wire 响应的 `data[n].message` 字段中**已经**被替换成实际数值。`FieldError` 新增 `params: HashMap<String, serde_json::Value>`（`#[serde(skip)]`，框架内部），`AppError::Validation → IntoResponse` 在查到 i18n 翻译后内联执行替换
@@ -364,17 +376,18 @@ fn every_response_code_has_i18n_entries_in_all_langs() {
 
 v1.0 统一使用以下格式：
 
-| 来源 | field 值 | 示例 |
-|---|---|---|
-| 顶层字段 validator 失败 | 字段名（snake_case，**保留 Rust 字段名**） | `"user_name"` |
-| `#[serde(flatten)]` 嵌套失败 | `"<outer>.<inner>"` 点分路径 | `"page.page_num"` |
-| `Vec<T>` 列表内嵌 struct 失败 | `"<field>[<idx>]"` 方括号索引 | `"menu_ids[3]"` |
-| JSON 反序列化失败（body） | 字面量 `"body"` | `"body"` |
-| Query string 反序列化失败 | 字面量 `"query"` | `"query"` |
+| 来源                          | field 值                                   | 示例              |
+| ----------------------------- | ------------------------------------------ | ----------------- |
+| 顶层字段 validator 失败       | 字段名（snake_case，**保留 Rust 字段名**） | `"user_name"`     |
+| `#[serde(flatten)]` 嵌套失败  | `"<outer>.<inner>"` 点分路径               | `"page.page_num"` |
+| `Vec<T>` 列表内嵌 struct 失败 | `"<field>[<idx>]"` 方括号索引              | `"menu_ids[3]"`   |
+| JSON 反序列化失败（body）     | 字面量 `"body"`                            | `"body"`          |
+| Query string 反序列化失败     | 字面量 `"query"`                           | `"query"`         |
 
 **v1.0 已知分歧**：当前代码使用的是**snake_case Rust 字段名**（`page_num` 而非 `pageNum`），但响应 body 里的其他地方用 `camelCase`（`pageNum`）。v1.0 **必须** 统一为 camelCase：见 §12 gap。
 
 **规则**：
+
 - 嵌套路径分隔符**必须** 是 `.`，**不得** 是 `/` / `:` / `->`
 - 列表索引**必须** 是 `[N]` 方括号，**不得** 是 `.N` 或 `(N)`
 - 格式**不得** 有其他变体
@@ -392,6 +405,7 @@ v1.0 统一使用以下格式：
 **v1.0 建议**（非强制）：常用业务 validator（`status_flag`, `sex_flag`, `yes_no_flag`, `positive_i32`）**应当** 提升到 `framework::validation::flags` 模块，供所有 modules 复用。
 
 **v1.0 强制**：
+
 - 自定义 validator **必须** 通过 `#[validate(custom = "fn_name")]` 接入
 - 自定义 validator **必须** 返回 `Result<(), ValidationError>`，错误 code 用 snake_case，如 `ValidationError::new("status_flag")`
 - i18n 条目**必须** 同步添加 `valid.<code>`（例如 `"valid.status_flag": "状态必须是 0（启用）或 1（禁用）"`）
@@ -404,24 +418,24 @@ v1.0 统一使用以下格式：
 
 ## 7. 禁止模式
 
-| 模式 | 为什么禁止 | 替代方案 |
-|---|---|---|
-| Handler 直接 `Json(body).into_response()` | 绕过 envelope，wire 漂移 | 返回 `Result<ApiResponse<T>, AppError>` |
-| Handler 返回 `Result<T, E>` 非 `AppError` 变体 | 不会被 axum 正确映射 | 用 `AppError` 作为唯一 error 类型 |
-| `Internal(#[from] anyhow::Error)` | `?` 隐式升级跳过显式决策点 | 移除 `#[from]`，强制 `.into_internal()` |
-| `AppError::Business { code, params: Some(...), data: Some(...) }` 字段 literal | 绕过规范构造器，容易漏 variant | 只用 `AppError::business(code)` 构造器 |
-| `ApiResponse::with_code(non_success, ...)` | 错误响应必须走 AppError，不允许 handler 绕过 | 删除 `with_code`，只保留 `ok/success` |
-| 两份 wire struct（`ApiResponse` + `ErrorBody`） | drift 风险 | v1.0 合并为一份 |
-| 状态码 match 散落 `status_code()` / `IntoResponse` / tests 三处 | exhaustive 漏检 | 用单源映射表或常量方法 |
-| `AppError::Business.data` 携带业务 payload | 0 调用者，纯死字段 | 删除；成功路径返回数据走 `ApiResponse<T>` |
-| `business_with_params` 保留 | 0 调用者；将来参数化走 v1.1 结构化方案 | 删除；锁定实现时恢复 |
-| 直接字段 literal 构造 `FieldError` 在 framework 外 | 破坏 DAO/wire 隔离 | 只在 extractors / AppError::IntoResponse 内构造 |
-| 新增 `AppError` variant 不改本规范 | 闭合集合失效 | 先改本规范 §2.3 再改代码 |
-| 新增 `ResponseCode` 常量不同步 i18n JSON | 覆盖测试会抓但 CI 晚于 review | PR 同时改 codes.rs + 两份 JSON + 测试列表 |
-| i18n key 不是数字或 `valid.xxx` | 命名空间膨胀 | 只用规定的两个命名空间 |
-| 占位符用 `%s` / `${}` | 和 NestJS i18next 不兼容 | 只用 `{name}` |
-| 在 repo 里 `.into_internal()` | 破坏分层 | repo 返 `anyhow::Result`，service 层转 |
-| 自定义 handler 全局 error layer（tower middleware） | 重复 `AppError::IntoResponse` 职责 | 走统一入口 |
+| 模式                                                                           | 为什么禁止                                   | 替代方案                                        |
+| ------------------------------------------------------------------------------ | -------------------------------------------- | ----------------------------------------------- |
+| Handler 直接 `Json(body).into_response()`                                      | 绕过 envelope，wire 漂移                     | 返回 `Result<ApiResponse<T>, AppError>`         |
+| Handler 返回 `Result<T, E>` 非 `AppError` 变体                                 | 不会被 axum 正确映射                         | 用 `AppError` 作为唯一 error 类型               |
+| `Internal(#[from] anyhow::Error)`                                              | `?` 隐式升级跳过显式决策点                   | 移除 `#[from]`，强制 `.into_internal()`         |
+| `AppError::Business { code, params: Some(...), data: Some(...) }` 字段 literal | 绕过规范构造器，容易漏 variant               | 只用 `AppError::business(code)` 构造器          |
+| `ApiResponse::with_code(non_success, ...)`                                     | 错误响应必须走 AppError，不允许 handler 绕过 | 删除 `with_code`，只保留 `ok/success`           |
+| 两份 wire struct（`ApiResponse` + `ErrorBody`）                                | drift 风险                                   | v1.0 合并为一份                                 |
+| 状态码 match 散落 `status_code()` / `IntoResponse` / tests 三处                | exhaustive 漏检                              | 用单源映射表或常量方法                          |
+| `AppError::Business.data` 携带业务 payload                                     | 0 调用者，纯死字段                           | 删除；成功路径返回数据走 `ApiResponse<T>`       |
+| `business_with_params` 保留                                                    | 0 调用者；将来参数化走 v1.1 结构化方案       | 删除；锁定实现时恢复                            |
+| 直接字段 literal 构造 `FieldError` 在 framework 外                             | 破坏 DAO/wire 隔离                           | 只在 extractors / AppError::IntoResponse 内构造 |
+| 新增 `AppError` variant 不改本规范                                             | 闭合集合失效                                 | 先改本规范 §2.3 再改代码                        |
+| 新增 `ResponseCode` 常量不同步 i18n JSON                                       | 覆盖测试会抓但 CI 晚于 review                | PR 同时改 codes.rs + 两份 JSON + 测试列表       |
+| i18n key 不是数字或 `valid.xxx`                                                | 命名空间膨胀                                 | 只用规定的两个命名空间                          |
+| 占位符用 `%s` / `${}`                                                          | 和 NestJS i18next 不兼容                     | 只用 `{name}`                                   |
+| 在 repo 里 `.into_internal()`                                                  | 破坏分层                                     | repo 返 `anyhow::Result`，service 层转          |
+| 自定义 handler 全局 error layer（tower middleware）                            | 重复 `AppError::IntoResponse` 职责           | 走统一入口                                      |
 
 ---
 
@@ -446,6 +460,7 @@ v1.0 不强制响应层 tracing（成功响应走 axum TraceLayer，已经有 me
 ### 9.1 `?` 跨层错误泄漏
 
 **反面**：
+
 ```rust
 // service 层
 let user = repo.find_by_id(&id).await?;   // ← 这里 repo 返 anyhow::Result，?
@@ -463,6 +478,7 @@ let user = repo.find_by_id(&id).await.into_internal()?;
 ### 9.2 Handler 返回 Option 或原始类型
 
 **反面**：
+
 ```rust
 async fn info(...) -> Option<dto::UserInfo> { ... }
 ```
@@ -474,6 +490,7 @@ async fn info(...) -> Option<dto::UserInfo> { ... }
 ### 9.3 service 直接用字段 literal 构造 business error
 
 **反面**：
+
 ```rust
 return Err(AppError::Business {
     code: ResponseCode::DATA_NOT_FOUND,
@@ -489,16 +506,16 @@ return Err(AppError::Business {
 
 ## 10. 演化路线
 
-| Phase | 内容 | 触发条件 | 状态 |
-|---|---|---|---|
-| **v1.0** | 合并 envelope、删死代码、移除 `#[from]`、i18n 覆盖测试、wire 回归测试 | 立即 | ✅ 2026-04-11 |
-| **v1.1 (validator 侧部分)** | `get_by_key_with_json_params` + `FieldError.params` (`#[serde(skip)]`) + `collect_errors` 传参 + IntoResponse 内联替换——**仅解决 validator 路径**（`range` / `length` 等），业务错误路径的 params 入口仍然关闭 | 随 pagination v1.1 一起落地 | ✅ 2026-04-11 |
-| **v2.0 (业务错误参数化)** | `AppError::business_with_i18n_params(code, HashMap)` 或等价接口，打通**非 validator** 路径的 `{placeholder}` 替换（`ACCOUNT_LOCKED` 的 `{minutes}` 等） | 账号锁定实装 / 首个非 validator 业务错误需要参数 | ⏳ 触发器未满足 |
-| **v1.2** | Field path camelCase 统一（`user_name` → `userName`），完善 `FieldError.field` 规范 | Vue web 客户端报字段名不一致 | ⏳ 触发器未满足 |
-| **v2.1** | Error envelope `data` 字段承载业务 payload（现在被 §2.3 禁止） | 出现 "部分成功 + 详情" 的合理需求 | ⏳ wire break，触发器未满足 |
-| **v2.2** | 结构化错误 trace id 链路（correlation id 跨服务） | 引入第二个 Rust 服务或 mesh 架构 | ⏳ 触发器未满足 |
-| **v3.0** | OpenAPI / utoipa 导出 schema | 引入 `utoipa` 依赖 | ⏳ 触发器未满足 |
-| **v3.1** | 流式响应 primitive（SSE / NDJSON） | 出现长连接或流式导出需求 | ⏳ 触发器未满足 |
+| Phase                       | 内容                                                                                                                                                                                                           | 触发条件                                         | 状态                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------- |
+| **v1.0**                    | 合并 envelope、删死代码、移除 `#[from]`、i18n 覆盖测试、wire 回归测试                                                                                                                                          | 立即                                             | ✅ 2026-04-11               |
+| **v1.1 (validator 侧部分)** | `get_by_key_with_json_params` + `FieldError.params` (`#[serde(skip)]`) + `collect_errors` 传参 + IntoResponse 内联替换——**仅解决 validator 路径**（`range` / `length` 等），业务错误路径的 params 入口仍然关闭 | 随 pagination v1.1 一起落地                      | ✅ 2026-04-11               |
+| **v2.0 (业务错误参数化)**   | `AppError::business_with_i18n_params(code, HashMap)` 或等价接口，打通**非 validator** 路径的 `{placeholder}` 替换（`ACCOUNT_LOCKED` 的 `{minutes}` 等）                                                        | 账号锁定实装 / 首个非 validator 业务错误需要参数 | ⏳ 触发器未满足             |
+| **v1.2**                    | Field path camelCase 统一（`user_name` → `userName`），完善 `FieldError.field` 规范                                                                                                                            | Vue web 客户端报字段名不一致                     | ⏳ 触发器未满足             |
+| **v2.1**                    | Error envelope `data` 字段承载业务 payload（现在被 §2.3 禁止）                                                                                                                                                 | 出现 "部分成功 + 详情" 的合理需求                | ⏳ wire break，触发器未满足 |
+| **v2.2**                    | 结构化错误 trace id 链路（correlation id 跨服务）                                                                                                                                                              | 引入第二个 Rust 服务或 mesh 架构                 | ⏳ 触发器未满足             |
+| **v3.0**                    | OpenAPI / utoipa 导出 schema                                                                                                                                                                                   | 引入 `utoipa` 依赖                               | ⏳ 触发器未满足             |
+| **v3.1**                    | 流式响应 primitive（SSE / NDJSON）                                                                                                                                                                             | 出现长连接或流式导出需求                         | ⏳ 触发器未满足             |
 
 **触发器表是 governance 工具**：v2+ 的事项在触发条件未满足前**不得** 提前做。
 
@@ -582,18 +599,18 @@ pub async fn create(state: &AppState, dto: CreateWidgetDto) -> Result<WidgetDeta
 
 **v1.0 实施完成时间**：2026-04-11
 
-| 规范条目 | 原状态 | 原改动方案 | 状态 |
-| --- | --- | --- | --- |
-| §2.1 单一 wire envelope | `ApiResponse<T>` + `ErrorBody` 两份 struct | 合并为 `ApiResponse<serde_json::Value>` | ✅ v1.0 (Task 3) |
-| §2.2 只保留 `ok/success` 构造入口 | `ApiResponse::with_code` 存在但 0 调用者 | 删除 `with_code` | ✅ v1.0 (Task 1) |
-| §2.3 删除 `Business.params/data` | 两字段都是 0 调用者 | 删除字段 + 简化 `Business { code }` | ✅ v1.0 (Task 2) |
-| §2.3 删除 `#[from] anyhow::Error` | v0 有 `#[from]` 隐式转换 | 移除 `#[from]` | ✅ v1.0 (Task 4) — 0 call sites affected（pre-verified by grep） |
-| §2.3 删除 `business_with_params` | 定义存在、0 调用者 | 删除 | ✅ v1.0 (Task 1) |
-| 状态码映射单源 | 散落 3 处（fn + match + test） | 合并为 match + exhaustive-check test | ✅ v1.0 (Task 5) |
-| §5.3 i18n 覆盖测试 | 无 | 新增 `every_response_code_has_i18n_entries_in_all_langs` | ✅ v1.0 (Task 6) — 发现并修复了 4 个缺失条目（429 / 1000 / 4001 / 4002 在 zh-CN 和 en-US 都缺） |
-| Wire 回归测试 | 无 | 新增 8 个 table-driven 测试（`ApiResponse::ok` / `success` + 5 个 `AppError` variant） | ✅ v1.0 (Task 7) |
-| §5.2 占位符解析 | ACCOUNT_LOCKED `{minutes}` 字面量泄露 | 延期 | ⏳ v1.1（与 pagination v1.1 Task 7 协调） |
-| §6.1 field 路径 camelCase 统一 | 当前 snake_case | 延期 | ⏳ v1.2（需要 web/app 协调） |
+| 规范条目                          | 原状态                                     | 原改动方案                                                                             | 状态                                                                                            |
+| --------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| §2.1 单一 wire envelope           | `ApiResponse<T>` + `ErrorBody` 两份 struct | 合并为 `ApiResponse<serde_json::Value>`                                                | ✅ v1.0 (Task 3)                                                                                |
+| §2.2 只保留 `ok/success` 构造入口 | `ApiResponse::with_code` 存在但 0 调用者   | 删除 `with_code`                                                                       | ✅ v1.0 (Task 1)                                                                                |
+| §2.3 删除 `Business.params/data`  | 两字段都是 0 调用者                        | 删除字段 + 简化 `Business { code }`                                                    | ✅ v1.0 (Task 2)                                                                                |
+| §2.3 删除 `#[from] anyhow::Error` | v0 有 `#[from]` 隐式转换                   | 移除 `#[from]`                                                                         | ✅ v1.0 (Task 4) — 0 call sites affected（pre-verified by grep）                                |
+| §2.3 删除 `business_with_params`  | 定义存在、0 调用者                         | 删除                                                                                   | ✅ v1.0 (Task 1)                                                                                |
+| 状态码映射单源                    | 散落 3 处（fn + match + test）             | 合并为 match + exhaustive-check test                                                   | ✅ v1.0 (Task 5)                                                                                |
+| §5.3 i18n 覆盖测试                | 无                                         | 新增 `every_response_code_has_i18n_entries_in_all_langs`                               | ✅ v1.0 (Task 6) — 发现并修复了 4 个缺失条目（429 / 1000 / 4001 / 4002 在 zh-CN 和 en-US 都缺） |
+| Wire 回归测试                     | 无                                         | 新增 8 个 table-driven 测试（`ApiResponse::ok` / `success` + 5 个 `AppError` variant） | ✅ v1.0 (Task 7)                                                                                |
+| §5.2 占位符解析                   | ACCOUNT_LOCKED `{minutes}` 字面量泄露      | 延期                                                                                   | ⏳ v1.1（与 pagination v1.1 Task 7 协调）                                                       |
+| §6.1 field 路径 camelCase 统一    | 当前 snake_case                            | 延期                                                                                   | ⏳ v1.2（需要 web/app 协调）                                                                    |
 
 **gap 总量**：10 项中 **8 项 v1.0 已实施**，2 项延期到 v1.1 / v1.2 触发时再做。
 
@@ -635,17 +652,20 @@ pub async fn create(state: &AppState, dto: CreateWidgetDto) -> Result<WidgetDeta
 提交涉及 handler / service / AppError / ApiResponse / ResponseCode / i18n 的 PR 时**必须** 逐项自查：
 
 **Wire 契约**：
+
 - [ ] Handler 返回类型为 `Result<ApiResponse<T>, AppError>`
 - [ ] 无直接 `Json(...).into_response()` 绕过 envelope
 - [ ] 成功响应用 `ApiResponse::ok(data)` 或 `ApiResponse::success()`
 
 **错误构造**：
+
 - [ ] Service 对 `anyhow::Result` 调用显式 `.into_internal()`，无隐式 `?` + `#[from]`
 - [ ] Option → 业务错误用 `.or_business(code)`
 - [ ] bool → 业务错误用 `.business_err_if(code)`
 - [ ] 业务错误用 `AppError::business(code)` / `AppError::auth(code)` / `AppError::forbidden(code)` 构造，无字段 literal
 
 **ResponseCode 新增**：
+
 - [ ] 遵守 §2.6 段位表
 - [ ] `framework/src/response/codes.rs` 常量添加
 - [ ] zh-CN.json + en-US.json **都**有条目
@@ -653,11 +673,13 @@ pub async fn create(state: &AppState, dto: CreateWidgetDto) -> Result<WidgetDeta
 - [ ] 本规范 §2.6 段位表同步更新
 
 **i18n 纪律**：
+
 - [ ] 新 i18n key 要么是数字（对应 ResponseCode），要么以 `"valid."` 开头
 - [ ] 占位符用 `{name}` 格式
 - [ ] 带占位符的条目在 PR 描述里标注 "v1.0 不解析 / v1.1 参数化后生效"（如有）
 
 **测试**：
+
 - [ ] `cargo test --workspace` 全绿
 - [ ] `cargo clippy --all-targets -- -D warnings` clean
 - [ ] `cargo fmt --check` clean

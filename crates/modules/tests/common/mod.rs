@@ -195,6 +195,21 @@ pub async fn cleanup_test_packages(pool: &PgPool, prefix: &str) {
         .expect("cleanup sys_tenant_package");
 }
 
+/// Cleanup helper — delete test depts.
+/// Matches `sys_dept.dept_name LIKE '{prefix}%'`.
+pub async fn cleanup_test_depts(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_depts: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_dept WHERE dept_name LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_dept");
+}
+
 /// Cleanup helper — delete test menus and their `sys_role_menu` bindings.
 /// Matches `sys_menu.menu_name LIKE '{prefix}%'`.
 pub async fn cleanup_test_menus(pool: &PgPool, prefix: &str) {
