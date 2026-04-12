@@ -1,10 +1,13 @@
 //! Menu HTTP handlers + router wiring.
 
+use std::convert::Infallible;
+
 use super::{dto, service};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
+use framework::operlog;
 use framework::response::ApiResponse;
 use framework::{require_authenticated, require_permission};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
@@ -127,15 +130,27 @@ pub(crate) async fn remove(
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(create).layer(require_permission!("system:menu:add")))
-        .routes(routes!(update).layer(require_permission!("system:menu:edit")))
+        .routes(routes!(create).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:menu:add"))
+                .layer(operlog!("菜单管理", Insert))
+        }))
+        .routes(routes!(update).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:menu:edit"))
+                .layer(operlog!("菜单管理", Update))
+        }))
         .routes(routes!(list).layer(require_permission!("system:menu:list")))
         .routes(routes!(tree_select).layer(require_permission!("system:menu:tree-select")))
         .routes(
             routes!(role_menu_tree_select).layer(require_permission!("system:menu:role-menu-tree")),
         )
         .routes(routes!(package_menu_tree_select).layer(require_authenticated!()))
-        .routes(routes!(cascade_remove).layer(require_permission!("system:menu:cascade-remove")))
+        .routes(routes!(cascade_remove).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:menu:cascade-remove"))
+                .layer(operlog!("菜单管理", Delete))
+        }))
         .routes(routes!(find_by_id).layer(require_permission!("system:menu:query")))
-        .routes(routes!(remove).layer(require_permission!("system:menu:remove")))
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:menu:remove"))
+                .layer(operlog!("菜单管理", Delete))
+        }))
 }

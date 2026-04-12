@@ -4,11 +4,14 @@
 //!   /system/dict/type/*   — DictType CRUD
 //!   /system/dict/data/*   — DictData CRUD
 
+use std::convert::Infallible;
+
 use super::{dto, service};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
+use framework::operlog;
 use framework::response::{ApiResponse, Page};
 use framework::{require_authenticated, require_permission};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
@@ -179,17 +182,35 @@ pub(crate) async fn remove_data(
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         // --- DictType routes ---
-        .routes(routes!(create_type).layer(require_permission!("system:dict:add")))
-        .routes(routes!(update_type).layer(require_permission!("system:dict:edit")))
+        .routes(routes!(create_type).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:dict:add"))
+                .layer(operlog!("字典管理", Insert))
+        }))
+        .routes(routes!(update_type).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:dict:edit"))
+                .layer(operlog!("字典管理", Update))
+        }))
         .routes(routes!(list_types).layer(require_permission!("system:dict:list")))
         .routes(routes!(type_option_select).layer(require_authenticated!()))
         .routes(routes!(find_type_by_id).layer(require_authenticated!()))
-        .routes(routes!(remove_types).layer(require_permission!("system:dict:remove")))
+        .routes(routes!(remove_types).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:dict:remove"))
+                .layer(operlog!("字典管理", Delete))
+        }))
         // --- DictData routes ---
-        .routes(routes!(create_data).layer(require_permission!("system:dict-data:add")))
-        .routes(routes!(update_data).layer(require_permission!("system:dict-data:edit")))
+        .routes(routes!(create_data).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:dict-data:add"))
+                .layer(operlog!("字典管理", Insert))
+        }))
+        .routes(routes!(update_data).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:dict-data:edit"))
+                .layer(operlog!("字典管理", Update))
+        }))
         .routes(routes!(list_data).layer(require_permission!("system:dict-data:list")))
         .routes(routes!(find_data_by_type).layer(require_authenticated!()))
         .routes(routes!(find_data_by_id).layer(require_authenticated!()))
-        .routes(routes!(remove_data).layer(require_permission!("system:dict-data:remove")))
+        .routes(routes!(remove_data).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:dict-data:remove"))
+                .layer(operlog!("字典管理", Delete))
+        }))
 }

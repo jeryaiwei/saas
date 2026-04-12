@@ -5,8 +5,9 @@ use crate::state::AppState;
 use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
-use framework::require_permission;
 use framework::response::{ApiResponse, Page};
+use framework::{operlog, require_permission};
+use std::convert::Infallible;
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
@@ -77,9 +78,18 @@ pub(crate) async fn remove(
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(create).layer(require_permission!("message:notice:add")))
-        .routes(routes!(update).layer(require_permission!("message:notice:edit")))
+        .routes(routes!(create).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("message:notice:add"))
+                .layer(operlog!("通知公告", Insert))
+        }))
+        .routes(routes!(update).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("message:notice:edit"))
+                .layer(operlog!("通知公告", Update))
+        }))
         .routes(routes!(list).layer(require_permission!("message:notice:list")))
         .routes(routes!(find_by_id).layer(require_permission!("message:notice:query")))
-        .routes(routes!(remove).layer(require_permission!("message:notice:remove")))
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("message:notice:remove"))
+                .layer(operlog!("通知公告", Delete))
+        }))
 }

@@ -1,5 +1,7 @@
 //! User HTTP handlers + router wiring.
 
+use std::convert::Infallible;
+
 use super::{dto, service};
 use crate::state::AppState;
 use axum::extract::{Path, State};
@@ -7,7 +9,7 @@ use framework::auth::Role;
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
-use framework::{require_authenticated, require_permission, require_role};
+use framework::{operlog, require_authenticated, require_permission, require_role};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
@@ -154,15 +156,33 @@ pub(crate) async fn update_auth_role(
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(create).layer(require_permission!("system:user:add")))
-        .routes(routes!(update).layer(require_permission!("system:user:edit")))
+        .routes(routes!(create).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:user:add"))
+                .layer(operlog!("用户管理", Insert))
+        }))
+        .routes(routes!(update).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:user:edit"))
+                .layer(operlog!("用户管理", Update))
+        }))
         .routes(routes!(list).layer(require_permission!("system:user:list")))
         .routes(routes!(option_select).layer(require_authenticated!()))
         .routes(routes!(info).layer(require_authenticated!()))
-        .routes(routes!(change_status).layer(require_role!(Role::TenantAdmin)))
-        .routes(routes!(reset_password).layer(require_role!(Role::TenantAdmin)))
-        .routes(routes!(update_auth_role).layer(require_role!(Role::TenantAdmin)))
+        .routes(routes!(change_status).map(|r| {
+            r.layer::<_, Infallible>(require_role!(Role::TenantAdmin))
+                .layer(operlog!("用户管理", Update))
+        }))
+        .routes(routes!(reset_password).map(|r| {
+            r.layer::<_, Infallible>(require_role!(Role::TenantAdmin))
+                .layer(operlog!("用户管理", Update))
+        }))
+        .routes(routes!(update_auth_role).map(|r| {
+            r.layer::<_, Infallible>(require_role!(Role::TenantAdmin))
+                .layer(operlog!("用户管理", Grant))
+        }))
         .routes(routes!(auth_role).layer(require_role!(Role::TenantAdmin)))
         .routes(routes!(find_by_id).layer(require_permission!("system:user:query")))
-        .routes(routes!(remove).layer(require_role!(Role::TenantAdmin)))
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_role!(Role::TenantAdmin))
+                .layer(operlog!("用户管理", Delete))
+        }))
 }

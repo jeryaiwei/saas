@@ -1,5 +1,7 @@
 //! Tenant HTTP handlers + router wiring.
 
+use std::convert::Infallible;
+
 use super::{dto, service};
 use crate::state::AppState;
 use axum::extract::{Path, State};
@@ -7,7 +9,7 @@ use framework::auth::Role;
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
-use framework::{require_access, require_permission};
+use framework::{operlog, require_access, require_permission};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
@@ -77,18 +79,27 @@ pub(crate) async fn remove(
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(create).layer(require_access! {
-            permission: "system:tenant:add",
-            role: Role::PlatformAdmin,
+        .routes(routes!(create).map(|r| {
+            r.layer::<_, Infallible>(require_access! {
+                permission: "system:tenant:add",
+                role: Role::PlatformAdmin,
+            })
+            .layer(operlog!("租户管理", Insert))
         }))
-        .routes(routes!(update).layer(require_permission!("system:tenant:edit")))
+        .routes(routes!(update).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:tenant:edit"))
+                .layer(operlog!("租户管理", Update))
+        }))
         .routes(routes!(list).layer(require_access! {
             permission: "system:tenant:list",
             role: Role::SuperAdmin,
         }))
         .routes(routes!(find_by_id).layer(require_permission!("system:tenant:query")))
-        .routes(routes!(remove).layer(require_access! {
-            permission: "system:tenant:remove",
-            role: Role::PlatformAdmin,
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_access! {
+                permission: "system:tenant:remove",
+                role: Role::PlatformAdmin,
+            })
+            .layer(operlog!("租户管理", Delete))
         }))
 }

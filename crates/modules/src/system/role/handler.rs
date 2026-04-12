@@ -6,7 +6,8 @@ use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
-use framework::{require_authenticated, require_permission};
+use framework::{operlog, require_authenticated, require_permission};
+use std::convert::Infallible;
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
@@ -153,17 +154,35 @@ pub(crate) async fn unassign_users(
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(create).layer(require_permission!("system:role:add")))
-        .routes(routes!(update).layer(require_permission!("system:role:edit")))
+        .routes(routes!(create).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:role:add"))
+                .layer(operlog!("角色管理", Insert))
+        }))
+        .routes(routes!(update).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:role:edit"))
+                .layer(operlog!("角色管理", Update))
+        }))
         .routes(routes!(list).layer(require_permission!("system:role:list")))
         .routes(routes!(option_select).layer(require_authenticated!()))
-        .routes(routes!(change_status).layer(require_permission!("system:role:change-status")))
+        .routes(routes!(change_status).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:role:change-status"))
+                .layer(operlog!("角色管理", Update))
+        }))
         .routes(routes!(allocated_users).layer(require_permission!("system:role:allocated-list")))
         .routes(
             routes!(unallocated_users).layer(require_permission!("system:role:unallocated-list")),
         )
-        .routes(routes!(assign_users).layer(require_permission!("system:role:select-auth-all")))
-        .routes(routes!(unassign_users).layer(require_permission!("system:role:cancel-auth")))
+        .routes(routes!(assign_users).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:role:select-auth-all"))
+                .layer(operlog!("角色管理", Grant))
+        }))
+        .routes(routes!(unassign_users).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:role:cancel-auth"))
+                .layer(operlog!("角色管理", Grant))
+        }))
         .routes(routes!(find_by_id).layer(require_permission!("system:role:query")))
-        .routes(routes!(remove).layer(require_permission!("system:role:remove")))
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:role:remove"))
+                .layer(operlog!("角色管理", Delete))
+        }))
 }

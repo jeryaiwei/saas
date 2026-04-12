@@ -1,12 +1,14 @@
 //! Tenant Package HTTP handlers + router wiring.
 
+use std::convert::Infallible;
+
 use super::{dto, service};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
-use framework::{require_authenticated, require_permission};
+use framework::{operlog, require_authenticated, require_permission};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
@@ -88,10 +90,19 @@ pub(crate) async fn remove(
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(create).layer(require_permission!("system:tenant-package:add")))
-        .routes(routes!(update).layer(require_permission!("system:tenant-package:edit")))
+        .routes(routes!(create).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:tenant-package:add"))
+                .layer(operlog!("套餐管理", Insert))
+        }))
+        .routes(routes!(update).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:tenant-package:edit"))
+                .layer(operlog!("套餐管理", Update))
+        }))
         .routes(routes!(list).layer(require_permission!("system:tenant-package:list")))
         .routes(routes!(option_select).layer(require_authenticated!()))
         .routes(routes!(find_by_id).layer(require_permission!("system:tenant-package:query")))
-        .routes(routes!(remove).layer(require_permission!("system:tenant-package:remove")))
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:tenant-package:remove"))
+                .layer(operlog!("套餐管理", Delete))
+        }))
 }

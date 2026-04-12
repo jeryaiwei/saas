@@ -1,10 +1,13 @@
 //! LoginLog HTTP handlers + router wiring.
 
+use std::convert::Infallible;
+
 use super::{dto, service};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::ValidatedQuery;
+use framework::operlog;
 use framework::require_permission;
 use framework::response::{ApiResponse, Page};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
@@ -49,6 +52,12 @@ pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(list).layer(require_permission!("monitor:logininfor:list")))
         // literal-prefix routes BEFORE wildcard `/{id}`
-        .routes(routes!(clean).layer(require_permission!("monitor:logininfor:clean")))
-        .routes(routes!(remove).layer(require_permission!("monitor:logininfor:remove")))
+        .routes(routes!(clean).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("monitor:logininfor:clean"))
+                .layer(operlog!("登录日志", Clean))
+        }))
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("monitor:logininfor:remove"))
+                .layer(operlog!("登录日志", Delete))
+        }))
 }

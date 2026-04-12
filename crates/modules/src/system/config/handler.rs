@@ -1,10 +1,13 @@
 //! Config HTTP handlers + router wiring.
 
+use std::convert::Infallible;
+
 use super::{dto, service};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
+use framework::operlog;
 use framework::require_permission;
 use framework::response::{ApiResponse, Page};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
@@ -103,12 +106,24 @@ pub(crate) async fn remove(
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(create).layer(require_permission!("system:config:add")))
-        .routes(routes!(update).layer(require_permission!("system:config:edit")))
-        .routes(routes!(update_by_key).layer(require_permission!("system:config:edit-by-key")))
+        .routes(routes!(create).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:config:add"))
+                .layer(operlog!("配置管理", Insert))
+        }))
+        .routes(routes!(update).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:config:edit"))
+                .layer(operlog!("配置管理", Update))
+        }))
+        .routes(routes!(update_by_key).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:config:edit-by-key"))
+                .layer(operlog!("配置管理", Update))
+        }))
         .routes(routes!(list).layer(require_permission!("system:config:list")))
         // literal-prefix routes BEFORE wildcard `/{id}`
         .routes(routes!(find_by_key).layer(require_permission!("system:config:query-by-key")))
         .routes(routes!(find_by_id).layer(require_permission!("system:config:query")))
-        .routes(routes!(remove).layer(require_permission!("system:config:remove")))
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:config:remove"))
+                .layer(operlog!("配置管理", Delete))
+        }))
 }

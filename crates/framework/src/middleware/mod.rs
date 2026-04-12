@@ -13,10 +13,9 @@
 //! 5. [`telemetry`] — HTTP metrics (requests, latency).
 
 pub mod access;
-pub mod access_macros;
 pub mod auth;
+pub mod macros;
 pub mod operlog;
-pub mod operlog_macros;
 pub mod telemetry;
 pub mod tenant;
 pub mod tenant_http;
