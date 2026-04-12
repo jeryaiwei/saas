@@ -50,8 +50,16 @@ impl ResponseCode {
     pub const INVALID_CREDENTIALS: Self = Self(3002);
 
     // --- 4000-4029 tenant ---
-    pub const TENANT_DISABLED: Self = Self(4001);
+    pub const TENANT_NOT_FOUND: Self = Self(4001);
     pub const TENANT_EXPIRED: Self = Self(4002);
+    pub const TENANT_PROTECTED: Self = Self(4010);
+    pub const TENANT_COMPANY_EXISTS: Self = Self(4013);
+    pub const TENANT_PARENT_NOT_FOUND: Self = Self(4014);
+    pub const TENANT_HAS_CHILDREN: Self = Self(4016);
+    pub const TENANT_PACKAGE_NOT_FOUND: Self = Self(4020);
+    pub const TENANT_PACKAGE_CODE_EXISTS: Self = Self(4021);
+    pub const TENANT_PACKAGE_NAME_EXISTS: Self = Self(4022);
+    pub const TENANT_PACKAGE_IN_USE: Self = Self(4023);
 
     pub const fn as_i32(self) -> i32 {
         self.0

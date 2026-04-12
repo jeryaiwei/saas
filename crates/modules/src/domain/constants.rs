@@ -8,3 +8,8 @@
 /// must match. Used by `UserRepo::is_super_admin` guards across write
 /// endpoints.
 pub const SUPER_ADMIN_USERNAME: &str = "admin";
+
+/// The fixed `tenant_id` of the built-in system (super) tenant. This
+/// tenant is treated as the root of the tenant tree and must not be
+/// modified or deleted by normal operations.
+pub const SUPER_TENANT_ID: &str = "000000";

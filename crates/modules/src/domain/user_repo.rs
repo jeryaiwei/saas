@@ -449,44 +449,6 @@ impl UserRepo {
         Ok(user)
     }
 
-    /// Insert a `sys_user_tenant` row binding the user to the current tenant
-    /// as a default member (not admin). The `id` column has a gen_random_uuid()
-    /// default, so it's not in the INSERT column list.
-    ///
-    /// Temporary ownership — migrates to tenant_repo when that module lands
-    /// (Phase 1 Sub-Phase 5+).
-    ///
-    /// Requires `current_tenant_scope()` to return `Some` — callers must be
-    /// inside a tenant context, not super-tenant bypass.
-    #[tracing::instrument(skip_all, fields(user_id = %user_id))]
-    pub async fn insert_user_tenant_binding_tx(
-        tx: &mut Transaction<'_, Postgres>,
-        user_id: &str,
-    ) -> anyhow::Result<()> {
-        let tenant =
-            current_tenant_scope().context("insert_user_tenant_binding_tx: tenant_id required")?;
-        let audit = AuditInsert::now();
-        // is_default='1', is_admin='0', status='0' — all char(1) string literals.
-        // update_at has no DB default but is NOT NULL — supply CURRENT_TIMESTAMP.
-        // create_by / update_by stamped from AuditInsert to preserve audit trail
-        // parity with the sys_user insert in the same transaction.
-        sqlx::query(
-            "INSERT INTO sys_user_tenant \
-                (user_id, tenant_id, is_default, is_admin, status, \
-                 create_by, update_by, update_at) \
-             VALUES ($1, $2, '1', '0', '0', $3, $4, CURRENT_TIMESTAMP) \
-             ON CONFLICT (user_id, tenant_id) DO NOTHING",
-        )
-        .bind(user_id)
-        .bind(&tenant)
-        .bind(&audit.create_by)
-        .bind(&audit.update_by)
-        .execute(&mut **tx)
-        .await
-        .context("insert_user_tenant_binding_tx")?;
-        Ok(())
-    }
-
     /// Update user scalar fields. Tenant guard via EXISTS subquery.
     /// Returns rows_affected — 0 means not found in current tenant.
     /// Does NOT touch `user_name` (immutable per NestJS contract) or

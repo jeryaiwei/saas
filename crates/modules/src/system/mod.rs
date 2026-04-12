@@ -4,4 +4,6 @@
 //! add user, menu, dept, post, dict, config, tenant.
 
 pub mod role;
+pub mod tenant;
+pub mod tenant_package;
 pub mod user;

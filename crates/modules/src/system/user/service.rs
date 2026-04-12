@@ -5,7 +5,9 @@ use super::dto::{
     ResetPwdDto, UpdateUserDto, UserDetailResponseDto, UserInfoResponseDto,
     UserListItemResponseDto, UserOptionQueryDto, UserOptionResponseDto, UserProfileResponseDto,
 };
-use crate::domain::{RoleRepo, UserInsertParams, UserListFilter, UserRepo, UserUpdateParams};
+use crate::domain::{
+    RoleRepo, TenantRepo, UserInsertParams, UserListFilter, UserRepo, UserUpdateParams,
+};
 use crate::state::AppState;
 use anyhow::Context;
 use framework::context::RequestContext;
@@ -158,7 +160,12 @@ pub async fn create(
     .await
     .into_internal()?;
 
-    UserRepo::insert_user_tenant_binding_tx(&mut tx, &user.user_id)
+    // Tenant id is now an explicit parameter — extract from request context
+    // (previously called inside the method itself).
+    let current_tenant = framework::context::current_tenant_scope()
+        .context("create user: tenant_id required")
+        .into_internal()?;
+    TenantRepo::insert_user_tenant_binding_tx(&mut tx, &user.user_id, &current_tenant, "1", "0")
         .await
         .into_internal()?;
 

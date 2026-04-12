@@ -235,8 +235,16 @@ mod tests {
             ResponseCode::USER_NOT_FOUND,
             ResponseCode::INVALID_CREDENTIALS,
             // 4000-4029 tenant
-            ResponseCode::TENANT_DISABLED,
+            ResponseCode::TENANT_NOT_FOUND,
             ResponseCode::TENANT_EXPIRED,
+            ResponseCode::TENANT_PROTECTED,
+            ResponseCode::TENANT_COMPANY_EXISTS,
+            ResponseCode::TENANT_PARENT_NOT_FOUND,
+            ResponseCode::TENANT_HAS_CHILDREN,
+            ResponseCode::TENANT_PACKAGE_NOT_FOUND,
+            ResponseCode::TENANT_PACKAGE_CODE_EXISTS,
+            ResponseCode::TENANT_PACKAGE_NAME_EXISTS,
+            ResponseCode::TENANT_PACKAGE_IN_USE,
         ];
 
         for code in codes {

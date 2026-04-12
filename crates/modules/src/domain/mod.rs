@@ -8,11 +8,20 @@
 pub mod constants;
 pub mod entities;
 pub mod role_repo;
+pub mod tenant_package_repo;
+pub mod tenant_repo;
 pub mod user_repo;
 pub mod validators;
 
-pub use entities::{SysRole, SysUser, SysUserTenant};
+pub use entities::{SysRole, SysTenant, SysTenantPackage, SysUser, SysUserTenant};
 pub use role_repo::{
     AllocatedUserFilter, RoleInsertParams, RoleListFilter, RoleRepo, RoleUpdateParams,
+};
+pub use tenant_package_repo::{
+    PackageInsertParams, PackageListFilter, PackageUpdateParams, TenantPackageRepo,
+};
+pub use tenant_repo::{
+    AdminUserInfo, TenantInsertParams, TenantListFilter, TenantRepo, TenantUpdateParams,
+    TenantWithPackageName,
 };
 pub use user_repo::{UserInsertParams, UserListFilter, UserRepo, UserUpdateParams};

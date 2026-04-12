@@ -146,3 +146,51 @@ pub async fn cleanup_test_rows(pool: &PgPool, prefix: &str) {
         .await
         .expect("cleanup sys_role");
 }
+
+/// Cleanup helper — delete test tenants and their admin users/bindings.
+/// Matches `sys_tenant.company_name LIKE '{prefix}%'` and deletes related
+/// `sys_user_tenant` bindings and `sys_user` rows whose `user_name` matches
+/// the same prefix.
+pub async fn cleanup_test_tenants(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_tenants: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    // Delete user-tenant bindings for users created by test tenants
+    sqlx::query(
+        "DELETE FROM sys_user_tenant WHERE user_id IN \
+         (SELECT user_id FROM sys_user WHERE user_name LIKE $1)",
+    )
+    .bind(&pattern)
+    .execute(pool)
+    .await
+    .expect("cleanup sys_user_tenant for test tenant users");
+    // Delete users created as tenant admins
+    sqlx::query("DELETE FROM sys_user WHERE user_name LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_user for test tenant admins");
+    // Delete test tenants
+    sqlx::query("DELETE FROM sys_tenant WHERE company_name LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_tenant");
+}
+
+/// Cleanup helper — delete test packages by code prefix.
+/// Matches `sys_tenant_package.code LIKE '{prefix}%'`.
+pub async fn cleanup_test_packages(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_packages: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_tenant_package WHERE code LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_tenant_package");
+}

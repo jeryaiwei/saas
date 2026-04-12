@@ -118,3 +118,51 @@ impl SysRole {
         self.del_flag == "0" && self.status == "0"
     }
 }
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysTenant {
+    pub id: String,
+    pub tenant_id: String,
+    pub parent_id: Option<String>,
+    pub contact_user_name: Option<String>,
+    pub contact_phone: Option<String>,
+    pub company_name: String,
+    pub license_number: Option<String>,
+    pub address: Option<String>,
+    pub intro: Option<String>,
+    pub domain: Option<String>,
+    pub package_id: Option<String>,
+    pub expire_time: Option<DateTime<Utc>>,
+    pub account_count: i32,
+    pub storage_quota: i32,
+    pub storage_used: i32,
+    pub api_quota: i32,
+    pub language: String,
+    pub verify_status: Option<String>,
+    pub license_image_url: Option<String>,
+    pub reject_reason: Option<String>,
+    pub verified_at: Option<DateTime<Utc>>,
+    pub status: String,
+    pub del_flag: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysTenantPackage {
+    pub package_id: String,
+    pub code: String,
+    pub package_name: String,
+    pub menu_ids: Vec<String>,
+    pub menu_check_strictly: bool,
+    pub status: String,
+    pub del_flag: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+}
