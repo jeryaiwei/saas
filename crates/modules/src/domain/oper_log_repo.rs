@@ -10,7 +10,6 @@ use super::entities::SysOperLog;
 use anyhow::Context;
 use framework::context::current_tenant_scope;
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::PgPool;
 use tracing::instrument;
 
 const COLUMNS: &str = "\
@@ -68,9 +67,13 @@ impl OperLogRepo {
         page_size = filter.page.page_size,
     ))]
     pub async fn find_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: OperLogListFilter,
     ) -> anyhow::Result<framework::response::Page<SysOperLog>> {
+        let mut conn = conn
+            .acquire()
+            .await
+            .context("oper_log.find_page: acquire")?;
         let tenant = current_tenant_scope();
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
@@ -89,7 +92,7 @@ impl OperLogRepo {
                 .bind(filter.status.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "oper_log.find_page rows",
         )
         .await?;
@@ -104,7 +107,7 @@ impl OperLogRepo {
                 .bind(filter.oper_name.as_deref())
                 .bind(filter.business_type)
                 .bind(filter.status.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "oper_log.find_page count",
         )
         .await?;

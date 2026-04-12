@@ -13,7 +13,6 @@ use super::entities::SysTenant;
 use anyhow::Context;
 use framework::context::{audit_update_by, AuditInsert};
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::PgPool;
 use std::collections::HashMap;
 use tracing::instrument;
 
@@ -218,9 +217,10 @@ impl TenantRepo {
         total = tracing::field::Empty,
     ))]
     pub async fn find_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: TenantListFilter,
     ) -> anyhow::Result<framework::response::Page<TenantWithPackageName>> {
+        let mut conn = conn.acquire().await.context("tenant.find_page: acquire")?;
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
         let rows_sql = format!(
@@ -241,7 +241,7 @@ impl TenantRepo {
                 .bind(filter.status.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "tenant.find_page rows",
         )
         .await?;
@@ -261,7 +261,7 @@ impl TenantRepo {
                 .bind(filter.contact_phone.as_deref())
                 .bind(filter.company_name.as_deref())
                 .bind(filter.status.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "tenant.find_page count",
         )
         .await?;

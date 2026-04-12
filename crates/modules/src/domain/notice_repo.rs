@@ -10,7 +10,6 @@ use super::entities::SysNotice;
 use anyhow::Context;
 use framework::context::{audit_update_by, current_tenant_scope, AuditInsert};
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::PgPool;
 use tracing::instrument;
 
 const COLUMNS: &str = "\
@@ -83,9 +82,10 @@ impl NoticeRepo {
         page_size = filter.page.page_size,
     ))]
     pub async fn find_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: NoticeListFilter,
     ) -> anyhow::Result<framework::response::Page<SysNotice>> {
+        let mut conn = conn.acquire().await.context("notice.find_page: acquire")?;
         let tenant = current_tenant_scope();
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
@@ -103,7 +103,7 @@ impl NoticeRepo {
                 .bind(filter.status.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "notice.find_page rows",
         )
         .await?;
@@ -117,7 +117,7 @@ impl NoticeRepo {
                 .bind(filter.notice_title.as_deref())
                 .bind(filter.notice_type.as_deref())
                 .bind(filter.status.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "notice.find_page count",
         )
         .await?;

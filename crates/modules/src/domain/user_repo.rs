@@ -10,7 +10,6 @@ use anyhow::Context;
 use framework::constants::{PLATFORM_ID_DEFAULT, USER_TYPE_CUSTOM};
 use framework::context::{audit_update_by, current_tenant_scope, AuditInsert};
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::PgPool;
 
 pub struct UserRepo;
 
@@ -202,9 +201,10 @@ impl UserRepo {
         total = tracing::field::Empty,
     ))]
     pub async fn find_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: UserListFilter,
     ) -> anyhow::Result<framework::response::Page<SysUser>> {
+        let mut conn = conn.acquire().await.context("user.find_page: acquire")?;
         let tenant = current_tenant_scope();
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
@@ -227,7 +227,7 @@ impl UserRepo {
                 .bind(filter.dept_id.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "user.find_page rows",
         )
         .await?;
@@ -248,7 +248,7 @@ impl UserRepo {
                 .bind(filter.phonenumber.as_deref())
                 .bind(filter.status.as_deref())
                 .bind(filter.dept_id.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "user.find_page count",
         )
         .await?;

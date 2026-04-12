@@ -9,7 +9,6 @@ use super::entities::SysTenantPackage;
 use anyhow::Context;
 use framework::context::{audit_update_by, AuditInsert};
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::PgPool;
 use tracing::instrument;
 
 /// Single source of truth for `SELECT` column lists.
@@ -89,9 +88,13 @@ impl TenantPackageRepo {
         total = tracing::field::Empty,
     ))]
     pub async fn find_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: PackageListFilter,
     ) -> anyhow::Result<framework::response::Page<SysTenantPackage>> {
+        let mut conn = conn
+            .acquire()
+            .await
+            .context("tenant_package.find_page: acquire")?;
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
         let rows_sql = format!(
@@ -106,7 +109,7 @@ impl TenantPackageRepo {
                 .bind(filter.status.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "tenant_package.find_page rows",
         )
         .await?;
@@ -118,7 +121,7 @@ impl TenantPackageRepo {
             sqlx::query_scalar(&count_sql)
                 .bind(filter.package_name.as_deref())
                 .bind(filter.status.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "tenant_package.find_page count",
         )
         .await?;

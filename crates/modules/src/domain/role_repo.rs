@@ -13,7 +13,7 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use framework::context::{audit_update_by, current_tenant_scope, AuditInsert};
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::{Postgres, Transaction};
 use tracing::instrument;
 
 /// Projection row for allocated/unallocated user list queries. Local to
@@ -214,9 +214,10 @@ impl RoleRepo {
         total = tracing::field::Empty,
     ))]
     pub async fn find_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: RoleListFilter,
     ) -> anyhow::Result<framework::response::Page<SysRole>> {
+        let mut conn = conn.acquire().await.context("role.find_page: acquire")?;
         let tenant = current_tenant_scope();
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
@@ -234,7 +235,7 @@ impl RoleRepo {
                 .bind(filter.status.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "role.find_page rows",
         )
         .await?;
@@ -248,7 +249,7 @@ impl RoleRepo {
                 .bind(filter.name.as_deref())
                 .bind(filter.role_key.as_deref())
                 .bind(filter.status.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "role.find_page count",
         )
         .await?;
@@ -514,9 +515,13 @@ impl RoleRepo {
         total = tracing::field::Empty,
     ))]
     pub async fn find_allocated_users_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: AllocatedUserFilter,
     ) -> anyhow::Result<framework::response::Page<AllocatedUserRow>> {
+        let mut conn = conn
+            .acquire()
+            .await
+            .context("role.find_allocated_users_page: acquire")?;
         let tenant = current_tenant_scope();
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
@@ -538,7 +543,7 @@ impl RoleRepo {
                 .bind(filter.user_name.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "role.find_allocated_users_page rows",
         )
         .await?;
@@ -556,7 +561,7 @@ impl RoleRepo {
                 .bind(&filter.role_id)
                 .bind(tenant.as_deref())
                 .bind(filter.user_name.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "role.find_allocated_users_page count",
         )
         .await?;
@@ -613,6 +618,7 @@ impl RoleRepo {
     /// Dominated by `sys_user` table size (the universe); anti-join cost
     /// grows with total tenant user count, not role size.
     #[instrument(skip_all, fields(
+        tenant_id = tracing::field::Empty,
         role_id = %filter.role_id,
         has_name_filter = filter.user_name.is_some(),
         page_num = filter.page.page_num,
@@ -621,10 +627,17 @@ impl RoleRepo {
         total = tracing::field::Empty,
     ))]
     pub async fn find_unallocated_users_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: AllocatedUserFilter,
     ) -> anyhow::Result<framework::response::Page<AllocatedUserRow>> {
+        let mut conn = conn
+            .acquire()
+            .await
+            .context("role.find_unallocated_users_page: acquire")?;
         let tenant = current_tenant_scope();
+        if let Some(t) = tenant.as_deref() {
+            tracing::Span::current().record("tenant_id", t);
+        }
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
         let rows_sql = format!(
@@ -646,7 +659,7 @@ impl RoleRepo {
                 .bind(filter.user_name.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "role.find_unallocated_users_page rows",
         )
         .await?;
@@ -666,7 +679,7 @@ impl RoleRepo {
                 .bind(&filter.role_id)
                 .bind(tenant.as_deref())
                 .bind(filter.user_name.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "role.find_unallocated_users_page count",
         )
         .await?;

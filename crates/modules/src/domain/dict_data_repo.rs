@@ -6,7 +6,6 @@ use super::entities::SysDictData;
 use anyhow::Context;
 use framework::context::{audit_update_by, current_platform_scope, AuditInsert};
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
-use sqlx::PgPool;
 use tracing::instrument;
 
 const COLUMNS: &str = "\
@@ -138,9 +137,13 @@ impl DictDataRepo {
         page_size = filter.page.page_size,
     ))]
     pub async fn find_page(
-        pool: &PgPool,
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
         filter: DictDataListFilter,
     ) -> anyhow::Result<framework::response::Page<SysDictData>> {
+        let mut conn = conn
+            .acquire()
+            .await
+            .context("dict_data.find_page: acquire")?;
         let platform = current_platform_scope();
         let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
 
@@ -158,7 +161,7 @@ impl DictDataRepo {
                 .bind(filter.status.as_deref())
                 .bind(p.limit)
                 .bind(p.offset)
-                .fetch_all(pool),
+                .fetch_all(&mut *conn),
             "dict_data.find_page rows",
         )
         .await?;
@@ -172,7 +175,7 @@ impl DictDataRepo {
                 .bind(filter.dict_type.as_deref())
                 .bind(filter.dict_label.as_deref())
                 .bind(filter.status.as_deref())
-                .fetch_one(pool),
+                .fetch_one(&mut *conn),
             "dict_data.find_page count",
         )
         .await?;
