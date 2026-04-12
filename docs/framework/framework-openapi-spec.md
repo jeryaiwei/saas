@@ -168,23 +168,33 @@ pub(crate) async fn list(
 ```rust
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
+use framework::{operlog, require_permission};
+use std::convert::Infallible;
 
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(create).layer(require_permission!("system:post:add")))
+        .routes(routes!(create).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:post:add"))
+                .layer(operlog!("岗位管理", Insert))
+        }))
         .routes(routes!(list).layer(require_permission!("system:post:list")))
         .routes(routes!(option_select).layer(require_authenticated!()))
         .routes(routes!(find_by_id).layer(require_permission!("system:post:query")))
-        .routes(routes!(remove).layer(require_permission!("system:post:remove")))
+        .routes(routes!(remove).map(|r| {
+            r.layer::<_, Infallible>(require_permission!("system:post:remove"))
+                .layer(operlog!("岗位管理", Delete))
+        }))
 }
 ```
 
 ### 5.2 路由注册规则
 
-- 每个 handler 一行 `.routes(routes!(fn_name).layer(...))`
+- 每个 handler 一行 `.routes(routes!(fn_name)...)`
 - `routes!` 从 `#[utoipa::path]` 自动读取 path 和 HTTP method
 - 同一 path 不同 method（如 GET `/{id}` + DELETE `/{id}`）**分开注册**
-- 权限通过 `.layer()` 挂载（`UtoipaMethodRouterExt` trait 提供）
+- 只读路由：`.layer(require_permission!(...))` 直接链
+- 写路由：`.map(|r| r.layer::<_, Infallible>(...).layer(operlog!(...)))` 链式挂 permission + operlog
+- `Infallible` turbofish 用于解决 Tower layer 类型推断歧义
 
 ### 5.3 权限 4 种模式
 
@@ -272,6 +282,9 @@ security(("bearer_auth" = [])),
 | 租户管理 | tenant |
 | 套餐管理 | tenant_package |
 | 用户管理 | user |
+| 通知公告 | notice |
+| 操作日志 | oper_log |
+| 登录日志 | login_log |
 
 ---
 
@@ -281,10 +294,11 @@ security(("bearer_auth" = [])),
 | --- | --- |
 | /swagger-ui | 200 |
 | /api-docs/openapi.json | 自动生成 |
-| paths | 58 (78 handlers, 部分共享 path) |
-| schemas | 88 |
+| paths | 66 (90 handlers, 部分共享 path) |
+| schemas | 96 |
 | securitySchemes | bearer_auth (JWT) |
-| 中文 summary | 78 个端点全覆盖 |
+| 中文 summary | 90 个端点全覆盖 |
+| operlog 覆盖 | 43 个写路由 |
 
 ---
 

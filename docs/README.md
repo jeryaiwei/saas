@@ -7,7 +7,7 @@
 | 端点数 | 78 (auth 4 + role 11 + user 11 + tenant 5 + tenant_package 6 + menu 9 + dept 7 + post 6 + config 7 + dict 12) |
 | 测试数 | 293 |
 | Smoke | role 14 + user 16 + tenant 13 + menu 10 + dept 8 = 61 steps |
-| 框架规范 | 6 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi) |
+| 框架规范 | 7 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog) |
 | 业务设计 | 5 份 (role / user / tenant / menu / dept) |
 | 实施计划 | 8 份 (7 已执行 + 1 未执行) |
 | Swagger | /swagger-ui (58 paths, 88 schemas, Bearer JWT auth) |
@@ -28,6 +28,7 @@
 | [observability-spec](framework/framework-observability-spec.md) | v1.0 已落地 | root span 自动注入 request_id/tenant_id/user_id, middleware instrument, login event, span 字段命名, metric 命名约定 |
 | [repo-executor-spec](framework/framework-repo-executor-spec.md) | v1.0 | impl PgExecutor vs &PgPool vs &mut Transaction 选择规则, service 层事务边界, 禁止模式 |
 | [openapi-spec](framework/framework-openapi-spec.md) | v1.0 | utoipa + OpenApiRouter 架构, DTO derive 规范, handler 注解, router 注册, 权限模式, 中文 tag |
+| [operlog-spec](framework/framework-operlog-spec.md) | v1.0 | 操作日志两层设计 (OperlogMarkLayer + global_operlog), BusinessType, 43 写路由覆盖 |
 
 ### 业务模块设计 (`docs/specs/`)
 
