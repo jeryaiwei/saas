@@ -18,3 +18,4 @@
 Thumbs.db
 
 # Note: .sqlx/ IS committed (offline query metadata for CI)
+test-uploads/
