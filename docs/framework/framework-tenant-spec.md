@@ -21,31 +21,25 @@
 ### 1.1 判定规则
 
 ```rust
+/// 种子数据契约：超级租户 ID 固定为 "000000"
+pub const SUPER_TENANT_ID: &str = "000000";
+
 impl SysTenant {
-    /// 超级租户：无父级（唯一）
     fn is_super(&self) -> bool {
-        self.parent_id.is_none()
+        self.tenant_id == SUPER_TENANT_ID
     }
 
-    /// 平台租户：父级是超级租户
-    fn is_platform(&self, super_tenant_id: &str) -> bool {
-        self.parent_id.as_deref() == Some(super_tenant_id)
+    fn is_platform(&self) -> bool {
+        !self.is_super() && self.parent_id.as_deref() == Some(SUPER_TENANT_ID)
     }
 
-    /// 一般租户：有父级且父级不是超级租户
-    fn is_regular(&self, super_tenant_id: &str) -> bool {
-        !self.is_super() && !self.is_platform(super_tenant_id)
+    fn is_regular(&self) -> bool {
+        !self.is_super() && !self.is_platform()
     }
 }
 ```
 
-`super_tenant_id` 启动时从数据库查询一次并缓存：
-
-```sql
-SELECT tenant_id FROM sys_tenant WHERE parent_id IS NULL LIMIT 1
-```
-
-**不依赖硬编码** `'000000'`——种子数据用 `'000000'` 作为默认值，但代码判断依据是 `parent_id IS NULL`。
+`SUPER_TENANT_ID = "000000"` 是与种子数据的固定契约，不需要运行时查询。
 
 ### 1.2 层级约束
 
@@ -155,17 +149,13 @@ User Alice:
 ### 4.2 判定函数
 
 ```rust
-fn get_admin_role(
-    tenant: &SysTenant,
-    is_admin: bool,
-    super_tenant_id: &str,
-) -> AdminRole {
+fn get_admin_role(tenant: &SysTenant, is_admin: bool) -> AdminRole {
     if !is_admin {
         return AdminRole::User;
     }
     if tenant.is_super() {
         AdminRole::SuperAdmin
-    } else if tenant.is_platform(super_tenant_id) {
+    } else if tenant.is_platform() {
         AdminRole::PlatformAdmin
     } else {
         AdminRole::TenantAdmin
@@ -253,7 +243,6 @@ POST /auth/login { username, password }
 fn can_switch_to(
     user: &UserSession,
     target: &SysTenant,
-    super_tenant_id: &str,
 ) -> Result<()> {
     // 1. 不能切到当前租户
     if user.tenant_id.as_deref() == Some(&target.tenant_id) {
@@ -277,12 +266,12 @@ fn can_switch_to(
     }
 
     // 5. 超级管理员 → 任意
-    if is_super_admin(user, super_tenant_id) {
+    if is_super_admin(user) {
         return Ok(());
     }
 
     // 6. 平台管理员 → 本平台下的租户
-    if is_platform_admin(user, super_tenant_id) {
+    if is_platform_admin(user) {
         if target.parent_id.as_deref() == user.platform_id.as_deref() {
             return Ok(());
         }
@@ -498,7 +487,6 @@ POST /auth/refresh-token { refreshToken }
 
 | 功能 | 优先级 | 说明 |
 | --- | --- | --- |
-| 超级租户判定改为 `parent_id IS NULL` | **高** | 替代硬编码 `'000000'` |
 | 权限计算补套餐过滤 | **高** | 普通用户权限 ∩ 套餐 menuIds |
 | 无套餐拒绝登录 | **高** | 非超级租户必须有套餐 |
 | 切换时保存 switchedFrom | 中 | Redis 快照恢复 |
