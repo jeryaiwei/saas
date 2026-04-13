@@ -15,14 +15,14 @@
 use axum::{
     http::{request::Parts, HeaderValue, Method},
     middleware::{from_fn, from_fn_with_state},
-    Router,
+    Extension, Router,
 };
 use framework::{
     config::AppConfig,
     infra::{pg, redis},
     middleware::{
         auth::{self as auth_mw, AuthState},
-        operlog, telemetry as telemetry_mw, tenant as tenant_mw, tenant_http,
+        telemetry as telemetry_mw, tenant as tenant_mw, tenant_http,
     },
     telemetry,
 };
@@ -112,9 +112,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state)
         // innermost custom layers
         .layer(from_fn_with_state(tenant_state, tenant_mw::tenant_guard))
-        .layer(from_fn(move |req, next| {
-            operlog::global_operlog(operlog_pool.clone(), req, next)
-        }))
+        .layer(Extension(operlog_pool)) // PgPool for operlog route-level middleware
         .layer(from_fn_with_state(auth_state, auth_mw::auth))
         // telemetry
         .layer(from_fn(telemetry_mw::metrics_middleware))

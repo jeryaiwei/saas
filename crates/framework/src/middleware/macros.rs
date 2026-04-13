@@ -163,7 +163,7 @@ macro_rules! __require_access_set {
 #[macro_export]
 macro_rules! operlog {
     ($title:expr, $biz_type:ident) => {
-        $crate::middleware::operlog::OperlogMarkLayer::new(
+        $crate::middleware::operlog::OperlogLayer::new(
             $title,
             $crate::middleware::operlog::BusinessType::$biz_type,
         )

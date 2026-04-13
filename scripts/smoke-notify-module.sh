@@ -106,7 +106,7 @@ assert_eq 200 "$SELECT_CODE" "template select returns code=200"
 # ---------------------------------------------------------------------------
 step "6. POST send notify message"
 SEND_RESP=$(curl -sS -X POST "$BASE/message/notify-message/send" "${H[@]}" \
-  -d "{\"userId\":\"${USER_ID}\",\"templateId\":\"${TEMPLATE_ID}\",\"templateCode\":\"${TPL_CODE}\",\"templateNickname\":\"test\",\"templateContent\":\"hello world\"}")
+  -d "{\"userId\":\"${USER_ID}\",\"templateId\":${TEMPLATE_ID},\"templateCode\":\"${TPL_CODE}\",\"templateNickname\":\"test\",\"templateContent\":\"hello world\"}")
 echo "$SEND_RESP" | python3 -m json.tool
 SEND_CODE=$(echo "$SEND_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])")
 assert_eq 200 "$SEND_CODE" "send message returns code=200"
