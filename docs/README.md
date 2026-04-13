@@ -8,7 +8,7 @@
 | 模块数 | 22 (system 9 + message 9 + monitor 2 + auth 1 + health 1) |
 | 测试数 | 304 |
 | Smoke | 12 scripts, 119 steps (role 14 + user 16 + tenant 13 + menu 10 + dept 8 + post 8 + config 9 + dict 11 + notice 7 + notify 12 + operlog 6 + loginlog 5) |
-| 框架规范 | 7 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog) |
+| 框架规范 | 8 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog / tenant) |
 | 业务设计 | 5 份 (role / user / tenant / menu / dept) |
 | Swagger | /swagger-ui (Bearer JWT, 中文 tag/summary) |
 | Operlog | 65 写路由自动记录操作日志 |
@@ -30,6 +30,7 @@
 | [repo-executor-spec](framework/framework-repo-executor-spec.md) | v1.0 | impl PgExecutor vs &PgPool vs &mut Transaction 选择规则, service 层事务边界, 禁止模式 |
 | [openapi-spec](framework/framework-openapi-spec.md) | v1.0 | utoipa + OpenApiRouter 架构, DTO derive 规范, handler 注解, router 注册, 权限模式, 中文 tag |
 | [operlog-spec](framework/framework-operlog-spec.md) | v1.1 | 操作日志路由级设计 (OperlogLayer + Extension&lt;PgPool&gt;), BusinessType, 65 写路由覆盖 |
+| [tenant-spec](framework/framework-tenant-spec.md) | v1.0 | 三层租户架构, 套餐绑定, 管理员层级, 权限计算, 租户切换, Session 结构, 数据过滤模型 |
 
 ### 业务模块设计 (`docs/specs/`)
 
