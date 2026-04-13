@@ -372,6 +372,45 @@ impl UploadRepo {
         Ok(affected)
     }
 
+    /// Find an active file by MD5 hash within the same tenant (for instant upload).
+    #[instrument(skip_all, fields(tenant_id = %tenant_id, file_md5 = %file_md5))]
+    pub async fn find_by_md5(
+        executor: impl sqlx::PgExecutor<'_>,
+        tenant_id: &str,
+        file_md5: &str,
+    ) -> anyhow::Result<Option<SysUpload>> {
+        let sql = format!(
+            "SELECT {COLUMNS} FROM sys_upload \
+             WHERE tenant_id = $1 AND file_md5 = $2 AND del_flag = '0' \
+             LIMIT 1"
+        );
+        let row = sqlx::query_as::<_, SysUpload>(&sql)
+            .bind(tenant_id)
+            .bind(file_md5)
+            .fetch_optional(executor)
+            .await
+            .context("upload.find_by_md5")?;
+        Ok(row)
+    }
+
+    /// Increment download count by 1.
+    #[instrument(skip_all, fields(upload_id = %upload_id))]
+    pub async fn increment_download_count(
+        executor: impl sqlx::PgExecutor<'_>,
+        upload_id: &str,
+    ) -> anyhow::Result<u64> {
+        let affected = sqlx::query(
+            "UPDATE sys_upload SET download_count = download_count + 1 \
+             WHERE upload_id = $1 AND del_flag = '0'",
+        )
+        .bind(upload_id)
+        .execute(executor)
+        .await
+        .context("upload.increment_download_count")?
+        .rows_affected();
+        Ok(affected)
+    }
+
     /// Find all versions of a file by parent_file_id. Tenant-scoped.
     #[instrument(skip_all, fields(parent_file_id = %parent_file_id))]
     pub async fn find_versions(

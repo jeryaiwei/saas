@@ -12,4 +12,5 @@ pub mod role;
 pub mod tenant;
 pub mod tenant_dashboard;
 pub mod tenant_package;
+pub mod upload;
 pub mod user;

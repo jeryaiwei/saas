@@ -40,6 +40,8 @@ pub struct AppConfig {
     pub redis_ttl: RedisTtlConfig,
     #[serde(default)]
     pub mail: MailConfig,
+    #[serde(default)]
+    pub upload: UploadConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -223,6 +225,36 @@ impl std::fmt::Debug for MailConfig {
 
 fn default_mail_password_key() -> String {
     "mail-password-encryption-key-32b".into()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UploadConfig {
+    #[serde(default = "default_storage_type")]
+    pub storage_type: String,
+    #[serde(default = "default_upload_dir")]
+    pub upload_dir: String,
+    #[serde(default = "default_max_file_size_mb")]
+    pub max_file_size_mb: u64,
+}
+
+impl Default for UploadConfig {
+    fn default() -> Self {
+        Self {
+            storage_type: default_storage_type(),
+            upload_dir: default_upload_dir(),
+            max_file_size_mb: default_max_file_size_mb(),
+        }
+    }
+}
+
+fn default_storage_type() -> String {
+    "local".into()
+}
+fn default_upload_dir() -> String {
+    "./uploads".into()
+}
+fn default_max_file_size_mb() -> u64 {
+    100
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -420,6 +452,7 @@ mod tests {
                 user_token_version: 604800,
             },
             mail: MailConfig::default(),
+            upload: UploadConfig::default(),
         }
     }
 

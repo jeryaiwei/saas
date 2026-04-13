@@ -6,6 +6,7 @@
 
 use framework::config::AppConfig;
 use framework::infra::redis::RedisPool;
+use framework::infra::storage::StorageProvider;
 use framework::telemetry::metrics::PrometheusHandle;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -26,6 +27,8 @@ pub struct AppState {
     pub mail_semaphore: Arc<Semaphore>,
     /// Semaphore for SMS send backpressure.
     pub sms_semaphore: Arc<Semaphore>,
+    /// File storage provider (local / S3 / …).
+    pub storage: Arc<dyn StorageProvider>,
 }
 
 impl AppState {

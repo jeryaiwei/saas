@@ -43,6 +43,11 @@ redis_keys:
 mail:
   mail_password_key: "mail-password-encryption-key-32b"
 
+upload:
+  storage_type: "local"
+  upload_dir: "./uploads"
+  max_file_size_mb: 100
+
 # TTLs in seconds — MUST match NestJS values
 redis_ttl:
   captcha: 300                     # 5 min

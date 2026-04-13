@@ -11,3 +11,4 @@ pub mod crypto;
 pub mod pg;
 pub mod redis;
 pub mod smtp;
+pub mod storage;

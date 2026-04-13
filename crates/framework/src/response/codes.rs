@@ -66,6 +66,9 @@ impl ResponseCode {
     pub const FOLDER_HAS_SUBFOLDERS: Self = Self(5011);
     pub const FILE_NOT_FOUND: Self = Self(5020);
     pub const SHARE_NOT_FOUND: Self = Self(5030);
+    pub const FILE_SIZE_EXCEEDED: Self = Self(5040);
+    pub const FILE_TYPE_NOT_ALLOWED: Self = Self(5041);
+    pub const FILE_UPLOAD_FAIL: Self = Self(5042);
 
     // --- 7000-7099 system module ---
     pub const DEPT_NOT_FOUND: Self = Self(7010);

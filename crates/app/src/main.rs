@@ -24,6 +24,7 @@ use framework::{
     },
     telemetry,
 };
+use modules::system::upload::local_storage::LocalStorageProvider;
 use modules::AppState;
 use regex::Regex;
 use std::{sync::Arc, time::Duration};
@@ -67,6 +68,8 @@ async fn main() -> anyhow::Result<()> {
 
     // 5. Compose shared AppState
     let (mail_sem, sms_sem) = AppState::new_semaphores();
+    let storage: Arc<dyn framework::infra::storage::StorageProvider> =
+        Arc::new(LocalStorageProvider::new(&cfg.upload.upload_dir));
     let state = AppState {
         config: cfg.clone(),
         pg: pg_pool,
@@ -74,6 +77,7 @@ async fn main() -> anyhow::Result<()> {
         metrics: metrics_handle,
         mail_semaphore: mail_sem,
         sms_semaphore: sms_sem,
+        storage,
     };
 
     // 6. Middleware sub-states

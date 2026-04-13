@@ -12,9 +12,9 @@ use axum::Router;
 use framework::{
     config::AppConfig,
     context::{scope, RequestContext},
-    infra::{pg, redis},
+    infra::{pg, redis, storage::StorageProvider},
 };
-use modules::{router, AppState};
+use modules::{router, system::upload::local_storage::LocalStorageProvider, AppState};
 use sqlx::PgPool;
 use std::sync::{Arc, Once};
 
@@ -53,6 +53,7 @@ pub async fn build_state_and_router() -> (AppState, Router) {
     let redis_pool = redis::build(&cfg.db.redis).expect("redis pool");
 
     let (mail_sem, sms_sem) = AppState::new_semaphores();
+    let storage: Arc<dyn StorageProvider> = Arc::new(LocalStorageProvider::new("./test-uploads"));
     let state = AppState {
         config: cfg,
         pg: pg_pool,
@@ -60,6 +61,7 @@ pub async fn build_state_and_router() -> (AppState, Router) {
         metrics: metrics_handle,
         mail_semaphore: mail_sem,
         sms_semaphore: sms_sem,
+        storage,
     };
     let router = router(state.clone());
     (state, router)

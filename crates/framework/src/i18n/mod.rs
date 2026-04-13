@@ -254,6 +254,9 @@ mod tests {
             ResponseCode::FOLDER_HAS_SUBFOLDERS,
             ResponseCode::FILE_NOT_FOUND,
             ResponseCode::SHARE_NOT_FOUND,
+            ResponseCode::FILE_SIZE_EXCEEDED,
+            ResponseCode::FILE_TYPE_NOT_ALLOWED,
+            ResponseCode::FILE_UPLOAD_FAIL,
             // 7000-7099 system module
             ResponseCode::DEPT_NOT_FOUND,
             ResponseCode::DEPT_PARENT_NOT_FOUND,
