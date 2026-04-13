@@ -78,6 +78,17 @@ impl ResponseCode {
     pub const NOTICE_NOT_FOUND: Self = Self(7060);
 
     // --- 7100-7199 message module ---
+    pub const NOTIFY_TEMPLATE_NOT_FOUND: Self = Self(7110);
+    pub const NOTIFY_TEMPLATE_CODE_EXISTS: Self = Self(7111);
+    pub const NOTIFY_MESSAGE_NOT_FOUND: Self = Self(7120);
+    pub const MAIL_ACCOUNT_NOT_FOUND: Self = Self(7130);
+    pub const MAIL_ACCOUNT_EXISTS: Self = Self(7131);
+    pub const MAIL_TEMPLATE_NOT_FOUND: Self = Self(7140);
+    pub const MAIL_TEMPLATE_CODE_EXISTS: Self = Self(7141);
+    pub const SMS_CHANNEL_NOT_FOUND: Self = Self(7150);
+    pub const SMS_CHANNEL_CODE_EXISTS: Self = Self(7151);
+    pub const SMS_TEMPLATE_NOT_FOUND: Self = Self(7160);
+    pub const SMS_TEMPLATE_CODE_EXISTS: Self = Self(7161);
 
     // --- 7200-7299 monitor module ---
     pub const OPER_LOG_NOT_FOUND: Self = Self(7200);

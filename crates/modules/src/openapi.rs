@@ -11,7 +11,7 @@ use utoipa::OpenApi;
     info(
         title = "SaaS Rust API",
         version = "1.0.0",
-        description = "Tea-SaaS Rust backend API documentation"
+        description = "SaaS Rust backend API documentation"
     ),
     servers((url = "/api/v1", description = "API v1")),
     tags(
@@ -25,6 +25,14 @@ use utoipa::OpenApi;
         (name = "租户管理", description = "租户 CRUD"),
         (name = "套餐管理", description = "租户套餐与菜单范围"),
         (name = "用户管理", description = "用户 CRUD 与授权"),
+        (name = "站内信模板", description = "站内信模板管理"),
+        (name = "站内信消息", description = "站内信消息管理"),
+        (name = "邮箱账号", description = "邮箱账号管理"),
+        (name = "邮件模板", description = "邮件模板管理"),
+        (name = "邮件日志", description = "邮件日志管理"),
+        (name = "短信渠道", description = "短信渠道管理"),
+        (name = "短信模板", description = "短信模板管理"),
+        (name = "短信日志", description = "短信日志管理"),
     ),
     security(("bearer_auth" = [])),
     modifiers(&SecurityAddon),

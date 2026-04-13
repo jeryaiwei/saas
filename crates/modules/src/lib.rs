@@ -35,6 +35,14 @@ fn api_openapi_router() -> OpenApiRouter<AppState> {
         .merge(system::user::router())
         // message
         .merge(message::notice::router())
+        .merge(message::notify_template::router())
+        .merge(message::notify_message::router())
+        .merge(message::mail_account::router())
+        .merge(message::mail_template::router())
+        .merge(message::mail_log::router())
+        .merge(message::sms_channel::router())
+        .merge(message::sms_template::router())
+        .merge(message::sms_log::router())
         // monitor
         .merge(monitor::oper_log::router())
         .merge(monitor::login_log::router())

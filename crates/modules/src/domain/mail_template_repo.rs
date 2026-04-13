@@ -1,0 +1,267 @@
+//! MailTemplateRepo — hand-written SQL for sys_mail_template.
+//!
+//! DAO conventions:
+//! 1. Each method is one SQL statement.
+//! 2. No cross-repo calls — only service.rs orchestrates.
+//! 3. INSERT/UPDATE/DELETE on sys_mail_template are single-owned here.
+//! 4. NOT tenant-scoped — no current_tenant_scope.
+
+use super::entities::SysMailTemplate;
+use anyhow::Context;
+use framework::context::{audit_update_by, AuditInsert};
+use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
+use tracing::instrument;
+
+const COLUMNS: &str = "\
+    id, name, code, account_id, nickname, title, content, params, status, \
+    remark, create_by, create_at, update_by, update_at, del_flag";
+
+const PAGE_WHERE: &str = "\
+    WHERE del_flag = '0' \
+      AND ($1::varchar IS NULL OR name LIKE '%' || $1 || '%') \
+      AND ($2::varchar IS NULL OR code LIKE '%' || $2 || '%') \
+      AND ($3::int IS NULL OR account_id = $3) \
+      AND ($4::varchar IS NULL OR status = $4)";
+
+#[derive(Debug)]
+pub struct MailTemplateListFilter {
+    pub name: Option<String>,
+    pub code: Option<String>,
+    pub account_id: Option<i32>,
+    pub status: Option<String>,
+    pub page: PageQuery,
+}
+
+#[derive(Debug)]
+pub struct MailTemplateInsertParams {
+    pub name: String,
+    pub code: String,
+    pub account_id: i32,
+    pub nickname: String,
+    pub title: String,
+    pub content: String,
+    pub params: Option<String>,
+    pub status: String,
+    pub remark: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct MailTemplateUpdateParams {
+    pub id: i32,
+    pub name: Option<String>,
+    pub code: Option<String>,
+    pub account_id: Option<i32>,
+    pub nickname: Option<String>,
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub params: Option<Option<String>>,
+    pub status: Option<String>,
+    pub remark: Option<Option<String>>,
+}
+
+pub struct MailTemplateRepo;
+
+impl MailTemplateRepo {
+    #[instrument(skip_all, fields(id = %id))]
+    pub async fn find_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: i32,
+    ) -> anyhow::Result<Option<SysMailTemplate>> {
+        let sql = format!(
+            "SELECT {COLUMNS} FROM sys_mail_template \
+             WHERE id = $1 AND del_flag = '0' \
+             LIMIT 1"
+        );
+        let row = sqlx::query_as::<_, SysMailTemplate>(&sql)
+            .bind(id)
+            .fetch_optional(executor)
+            .await
+            .context("mail_template.find_by_id")?;
+        Ok(row)
+    }
+
+    #[instrument(skip_all, fields(
+        has_name = filter.name.is_some(),
+        has_code = filter.code.is_some(),
+        has_account_id = filter.account_id.is_some(),
+        has_status = filter.status.is_some(),
+        page_num = filter.page.page_num,
+        page_size = filter.page.page_size,
+    ))]
+    pub async fn find_page(
+        conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
+        filter: MailTemplateListFilter,
+    ) -> anyhow::Result<framework::response::Page<SysMailTemplate>> {
+        let mut conn = conn
+            .acquire()
+            .await
+            .context("mail_template.find_page: acquire")?;
+        let p = PaginationParams::from(filter.page.page_num, filter.page.page_size);
+
+        let rows_sql = format!(
+            "SELECT {COLUMNS} FROM sys_mail_template {PAGE_WHERE} \
+             ORDER BY id DESC \
+             LIMIT $5 OFFSET $6"
+        );
+        let rows_start = std::time::Instant::now();
+        let rows = with_timeout(
+            sqlx::query_as::<_, SysMailTemplate>(&rows_sql)
+                .bind(filter.name.as_deref())
+                .bind(filter.code.as_deref())
+                .bind(filter.account_id)
+                .bind(filter.status.as_deref())
+                .bind(p.limit)
+                .bind(p.offset)
+                .fetch_all(&mut *conn),
+            "mail_template.find_page rows",
+        )
+        .await?;
+        let rows_ms = rows_start.elapsed().as_millis();
+
+        let count_sql = format!("SELECT COUNT(*) FROM sys_mail_template {PAGE_WHERE}");
+        let count_start = std::time::Instant::now();
+        let observed_total: i64 = with_timeout(
+            sqlx::query_scalar(&count_sql)
+                .bind(filter.name.as_deref())
+                .bind(filter.code.as_deref())
+                .bind(filter.account_id)
+                .bind(filter.status.as_deref())
+                .fetch_one(&mut *conn),
+            "mail_template.find_page count",
+        )
+        .await?;
+        let count_ms = count_start.elapsed().as_millis();
+
+        let mut rows = rows;
+        if rows.len() as i64 > p.limit {
+            rows.truncate(p.limit as usize);
+        }
+
+        let total_ms = rows_ms + count_ms;
+        if total_ms > SLOW_QUERY_WARN_MS {
+            tracing::warn!(
+                rows_ms,
+                count_ms,
+                total_ms,
+                "mail_template.find_page: slow query"
+            );
+        }
+
+        let total = PaginationParams::reconcile_total(observed_total, rows.len(), p.offset);
+        Ok(p.into_page(rows, total))
+    }
+
+    /// Check if a code already exists (excluding a given id for update scenarios).
+    #[instrument(skip_all, fields(code = %code))]
+    pub async fn exists_by_code(
+        executor: impl sqlx::PgExecutor<'_>,
+        code: &str,
+        exclude_id: Option<i32>,
+    ) -> anyhow::Result<bool> {
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(\
+                SELECT 1 FROM sys_mail_template \
+                WHERE code = $1 AND del_flag = '0' \
+                  AND ($2::int IS NULL OR id <> $2)\
+            )",
+        )
+        .bind(code)
+        .bind(exclude_id)
+        .fetch_one(executor)
+        .await
+        .context("mail_template.exists_by_code")?;
+        Ok(exists)
+    }
+
+    #[instrument(skip_all, fields(name = %params.name))]
+    pub async fn insert(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: MailTemplateInsertParams,
+    ) -> anyhow::Result<SysMailTemplate> {
+        let audit = AuditInsert::now();
+        let sql = format!(
+            "INSERT INTO sys_mail_template (\
+                name, code, account_id, nickname, title, content, params, \
+                status, del_flag, create_by, update_by, update_at, remark\
+            ) VALUES (\
+                $1, $2, $3, $4, $5, $6, $7, $8, '0', $9, $10, \
+                CURRENT_TIMESTAMP, $11\
+            ) RETURNING {COLUMNS}"
+        );
+        let row = sqlx::query_as::<_, SysMailTemplate>(&sql)
+            .bind(&params.name)
+            .bind(&params.code)
+            .bind(params.account_id)
+            .bind(&params.nickname)
+            .bind(&params.title)
+            .bind(&params.content)
+            .bind(params.params.as_deref())
+            .bind(&params.status)
+            .bind(&audit.create_by)
+            .bind(&audit.update_by)
+            .bind(params.remark.as_deref())
+            .fetch_one(executor)
+            .await
+            .context("mail_template.insert")?;
+        Ok(row)
+    }
+
+    #[instrument(skip_all, fields(id = %params.id))]
+    pub async fn update_by_id(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: MailTemplateUpdateParams,
+    ) -> anyhow::Result<u64> {
+        let update_by = audit_update_by();
+        let rows = sqlx::query(
+            "UPDATE sys_mail_template SET \
+                name       = COALESCE($2, name), \
+                code       = COALESCE($3, code), \
+                account_id = COALESCE($4, account_id), \
+                nickname   = COALESCE($5, nickname), \
+                title      = COALESCE($6, title), \
+                content    = COALESCE($7, content), \
+                params     = CASE WHEN $8::boolean THEN $9 ELSE params END, \
+                status     = COALESCE($10, status), \
+                remark     = CASE WHEN $11::boolean THEN $12 ELSE remark END, \
+                update_by  = $13, \
+                update_at  = CURRENT_TIMESTAMP \
+             WHERE id = $1 AND del_flag = '0'",
+        )
+        .bind(params.id)
+        .bind(params.name.as_deref())
+        .bind(params.code.as_deref())
+        .bind(params.account_id)
+        .bind(params.nickname.as_deref())
+        .bind(params.title.as_deref())
+        .bind(params.content.as_deref())
+        // params — nullable update via flag pattern
+        .bind(params.params.is_some())
+        .bind(params.params.as_ref().and_then(|o| o.as_deref()))
+        .bind(params.status.as_deref())
+        // remark — nullable update via flag pattern
+        .bind(params.remark.is_some())
+        .bind(params.remark.as_ref().and_then(|o| o.as_deref()))
+        .bind(&update_by)
+        .execute(executor)
+        .await
+        .context("mail_template.update_by_id")?
+        .rows_affected();
+        Ok(rows)
+    }
+
+    #[instrument(skip_all, fields(id = %id))]
+    pub async fn soft_delete(executor: impl sqlx::PgExecutor<'_>, id: i32) -> anyhow::Result<u64> {
+        let update_by = audit_update_by();
+        let rows = sqlx::query(
+            "UPDATE sys_mail_template SET del_flag = '1', update_by = $2, update_at = CURRENT_TIMESTAMP \
+             WHERE id = $1 AND del_flag = '0'",
+        )
+        .bind(id)
+        .bind(&update_by)
+        .execute(executor)
+        .await
+        .context("mail_template.soft_delete")?
+        .rows_affected();
+        Ok(rows)
+    }
+}

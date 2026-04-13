@@ -339,3 +339,154 @@ pub struct SysMenu {
     pub del_flag: String,
     pub i18n: Option<serde_json::Value>,
 }
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysNotifyTemplate {
+    pub id: i32,
+    pub name: String,
+    pub code: String,
+    pub nickname: String,
+    pub content: String,
+    pub params: Option<String>,
+    #[sqlx(rename = "type")]
+    pub r#type: i32,
+    pub status: String,
+    pub remark: Option<String>,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub del_flag: String,
+    pub i18n: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysNotifyMessage {
+    pub id: i64,
+    pub tenant_id: String,
+    pub user_id: String,
+    pub user_type: i32,
+    pub template_id: i32,
+    pub template_code: String,
+    pub template_nickname: String,
+    pub template_content: String,
+    pub template_params: Option<String>,
+    pub read_status: bool,
+    pub read_time: Option<DateTime<Utc>>,
+    pub del_flag: String,
+    pub create_at: DateTime<Utc>,
+    pub update_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysSmsChannel {
+    pub id: i32,
+    pub code: String,
+    pub name: String,
+    pub signature: String,
+    pub api_key: String,
+    pub api_secret: String,
+    pub callback_url: Option<String>,
+    pub status: String,
+    pub remark: Option<String>,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub del_flag: String,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysSmsTemplate {
+    pub id: i32,
+    pub channel_id: i32,
+    pub code: String,
+    pub name: String,
+    pub content: String,
+    pub params: Option<String>,
+    pub api_template_id: String,
+    #[sqlx(rename = "type")]
+    pub r#type: i32,
+    pub status: String,
+    pub remark: Option<String>,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub del_flag: String,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysSmsLog {
+    pub id: i64,
+    pub channel_id: i32,
+    pub channel_code: String,
+    pub template_id: i32,
+    pub template_code: String,
+    pub mobile: String,
+    pub content: String,
+    pub params: Option<String>,
+    pub send_status: i32,
+    pub send_time: Option<DateTime<Utc>>,
+    pub receive_status: Option<i32>,
+    pub receive_time: Option<DateTime<Utc>>,
+    pub api_send_code: Option<String>,
+    pub api_receive_code: Option<String>,
+    pub error_msg: Option<String>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysMailAccount {
+    pub id: i32,
+    pub mail: String,
+    pub username: String,
+    pub password: String,
+    pub host: String,
+    pub port: i32,
+    pub ssl_enable: bool,
+    pub status: String,
+    pub remark: Option<String>,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub del_flag: String,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysMailTemplate {
+    pub id: i32,
+    pub name: String,
+    pub code: String,
+    pub account_id: i32,
+    pub nickname: String,
+    pub title: String,
+    pub content: String,
+    pub params: Option<String>,
+    pub status: String,
+    pub remark: Option<String>,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub del_flag: String,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysMailLog {
+    pub id: i64,
+    pub user_id: Option<String>,
+    pub user_type: Option<i32>,
+    pub to_mail: String,
+    pub account_id: i32,
+    pub from_mail: String,
+    pub template_id: i32,
+    pub template_code: String,
+    pub template_nickname: String,
+    pub template_title: String,
+    pub template_content: String,
+    pub template_params: Option<String>,
+    pub send_status: i32,
+    pub send_time: Option<DateTime<Utc>>,
+    pub error_msg: Option<String>,
+}
