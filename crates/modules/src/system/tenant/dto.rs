@@ -279,6 +279,27 @@ pub struct ListTenantDto {
 }
 
 // ---------------------------------------------------------------------------
+// Tenant select-list / switch DTOs
+// ---------------------------------------------------------------------------
+
+/// Lightweight tenant option returned by `GET /system/tenant/select-list`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TenantSelectOptionDto {
+    pub tenant_id: String,
+    pub company_name: String,
+}
+
+/// Response for `GET /system/tenant/switch-status`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TenantSwitchStatusDto {
+    pub current_tenant_id: Option<String>,
+    pub default_tenant_id: Option<String>,
+    pub is_switched: bool,
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

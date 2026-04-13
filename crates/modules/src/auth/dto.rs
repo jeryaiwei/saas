@@ -4,6 +4,36 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+// ---------------------------------------------------------------------------
+// Tenant list for login page
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TenantListForLoginDto {
+    pub tenant_enabled: bool,
+    pub vo_list: Vec<TenantVo>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TenantVo {
+    pub tenant_id: String,
+    pub company_name: String,
+    pub domain: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Refresh token
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshTokenDto {
+    #[validate(length(min = 1))]
+    pub refresh_token: String,
+}
+
 #[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
 pub struct LoginDto {
     #[validate(length(min = 1, max = 64))]

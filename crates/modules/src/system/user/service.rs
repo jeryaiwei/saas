@@ -1,18 +1,19 @@
 //! User service — business orchestration.
 
 use super::dto::{
-    AuthRoleResponseDto, AuthRoleUpdateDto, ChangeUserStatusDto, CreateUserDto, ListUserDto,
-    ResetPwdDto, UpdateUserDto, UserDetailResponseDto, UserInfoResponseDto,
-    UserListItemResponseDto, UserOptionQueryDto, UserOptionResponseDto, UserProfileResponseDto,
+    AuthRoleResponseDto, AuthRoleUpdateDto, ChangeUserStatusDto, CreateUserDto, DeptTreeNodeDto,
+    ListUserDto, ResetPwdDto, UpdatePwdDto, UpdateProfileDto, UpdateUserDto,
+    UserDetailResponseDto, UserInfoResponseDto, UserListItemResponseDto, UserOptionQueryDto,
+    UserOptionResponseDto, UserProfileGetResponseDto, UserProfileResponseDto,
 };
 use crate::domain::{
-    RoleRepo, TenantRepo, UserInsertParams, UserListFilter, UserRepo, UserUpdateParams,
+    DeptRepo, RoleRepo, TenantRepo, UserInsertParams, UserListFilter, UserRepo, UserUpdateParams,
 };
 use crate::state::AppState;
 use anyhow::Context;
 use framework::context::RequestContext;
 use framework::error::{AppError, BusinessCheckBool, BusinessCheckOption, IntoAppError};
-use framework::infra::crypto::hash_password;
+use framework::infra::crypto::{hash_password, verify_password};
 use framework::response::{Page, ResponseCode};
 
 /// Returns true if `user_id` corresponds to the system super-admin row.
@@ -465,4 +466,173 @@ pub async fn info(state: &AppState) -> Result<UserInfoResponseDto, AppError> {
         .or_business(ResponseCode::DATA_NOT_FOUND)?;
 
     Ok(UserInfoResponseDto::from_entity(user))
+}
+
+// ---------------------------------------------------------------------------
+// Profile endpoints
+// ---------------------------------------------------------------------------
+
+/// Get current user's profile.
+#[tracing::instrument(skip_all)]
+pub async fn get_profile(state: &AppState) -> Result<UserProfileGetResponseDto, AppError> {
+    let user_id = RequestContext::with_current(|ctx| ctx.user_id.clone())
+        .flatten()
+        .or_business(ResponseCode::TOKEN_EXPIRED)?;
+
+    let user = UserRepo::find_by_id(&state.pg, &user_id)
+        .await
+        .into_internal()?
+        .or_business(ResponseCode::DATA_NOT_FOUND)?;
+
+    Ok(UserProfileGetResponseDto::from_entity(user))
+}
+
+/// Update current user's own profile.
+#[tracing::instrument(skip_all)]
+pub async fn update_profile(state: &AppState, dto: UpdateProfileDto) -> Result<(), AppError> {
+    let user_id = RequestContext::with_current(|ctx| ctx.user_id.clone())
+        .flatten()
+        .or_business(ResponseCode::TOKEN_EXPIRED)?;
+
+    let user = UserRepo::find_by_id(&state.pg, &user_id)
+        .await
+        .into_internal()?
+        .or_business(ResponseCode::DATA_NOT_FOUND)?;
+
+    let affected = UserRepo::update(
+        &state.pg,
+        UserUpdateParams {
+            user_id,
+            nick_name: dto.nick_name.unwrap_or(user.nick_name),
+            email: dto.email.unwrap_or(user.email),
+            phonenumber: dto.phonenumber.unwrap_or(user.phonenumber),
+            sex: dto.sex.unwrap_or(user.sex),
+            avatar: user.avatar,
+            status: user.status,
+            dept_id: user.dept_id,
+            remark: user.remark,
+        },
+    )
+    .await
+    .into_internal()?;
+
+    (affected == 0).business_err_if(ResponseCode::DATA_NOT_FOUND)?;
+    Ok(())
+}
+
+/// Change own password. Verifies old password first.
+#[tracing::instrument(skip_all)]
+pub async fn update_pwd(state: &AppState, dto: UpdatePwdDto) -> Result<(), AppError> {
+    let user_id = RequestContext::with_current(|ctx| ctx.user_id.clone())
+        .flatten()
+        .or_business(ResponseCode::TOKEN_EXPIRED)?;
+
+    let user = UserRepo::find_by_id(&state.pg, &user_id)
+        .await
+        .into_internal()?
+        .or_business(ResponseCode::DATA_NOT_FOUND)?;
+
+    // Verify old password
+    if !verify_password(&dto.old_password, &user.password) {
+        return Err(AppError::business(ResponseCode::OLD_PASSWORD_INCORRECT));
+    }
+
+    // Hash new password
+    let password_hash = hash_password(&dto.new_password)
+        .context("hash_password: update_pwd")
+        .into_internal()?;
+
+    // Update password
+    let affected = UserRepo::reset_password(&state.pg, &user_id, &password_hash)
+        .await
+        .into_internal()?;
+    (affected == 0).business_err_if(ResponseCode::DATA_NOT_FOUND)?;
+
+    // Bump token version to invalidate existing sessions
+    if let Err(e) = framework::auth::session::bump_user_token_version(
+        &state.redis,
+        &state.config.redis_keys,
+        &user_id,
+    )
+    .await
+    {
+        tracing::warn!(
+            error = %e,
+            user_id = %user_id,
+            "token version bump failed after password change"
+        );
+    }
+
+    Ok(())
+}
+
+/// Return department tree for user filtering. Builds a tree from the flat list.
+#[tracing::instrument(skip_all)]
+pub async fn dept_tree(state: &AppState) -> Result<Vec<DeptTreeNodeDto>, AppError> {
+    let depts = DeptRepo::find_option_list(&state.pg)
+        .await
+        .into_internal()?;
+
+    // Build flat nodes
+    let nodes: Vec<DeptTreeNodeDto> = depts
+        .into_iter()
+        .map(|d| DeptTreeNodeDto {
+            id: d.dept_id,
+            label: d.dept_name,
+            parent_id: d.parent_id,
+            children: Vec::new(),
+        })
+        .collect();
+
+    // Build tree using a two-pass approach
+    use std::collections::HashMap;
+    let mut index: HashMap<String, usize> = HashMap::new();
+    for (i, node) in nodes.iter().enumerate() {
+        index.insert(node.id.clone(), i);
+    }
+
+    // Collect parent-child relationships
+    let mut children_map: HashMap<String, Vec<usize>> = HashMap::new();
+    let mut root_indices: Vec<usize> = Vec::new();
+    for (i, node) in nodes.iter().enumerate() {
+        match &node.parent_id {
+            Some(pid) if pid != "0" && index.contains_key(pid) => {
+                children_map.entry(pid.clone()).or_default().push(i);
+            }
+            _ => {
+                root_indices.push(i);
+            }
+        }
+    }
+
+    // Recursively build tree from bottom up
+    fn build_subtree(
+        idx: usize,
+        nodes: &[DeptTreeNodeDto],
+        children_map: &HashMap<String, Vec<usize>>,
+    ) -> DeptTreeNodeDto {
+        let node = &nodes[idx];
+        let children = children_map
+            .get(&node.id)
+            .map(|child_indices| {
+                child_indices
+                    .iter()
+                    .map(|&ci| build_subtree(ci, nodes, children_map))
+                    .collect()
+            })
+            .unwrap_or_default();
+        DeptTreeNodeDto {
+            id: node.id.clone(),
+            label: node.label.clone(),
+            parent_id: node.parent_id.clone(),
+            children,
+        }
+    }
+
+    let tree: Vec<DeptTreeNodeDto> = root_indices
+        .into_iter()
+        .map(|i| build_subtree(i, &nodes, &children_map))
+        .collect();
+
+    Ok(tree)
 }

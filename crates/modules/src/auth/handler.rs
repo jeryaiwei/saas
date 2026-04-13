@@ -1,10 +1,12 @@
 //! Auth HTTP handlers + router.
 //!
 //! Routes:
-//! - `POST /auth/login`   — public (whitelisted by `framework::middleware::auth`)
-//! - `GET  /auth/code`    — public
-//! - `POST /auth/logout`  — authenticated
-//! - `GET  /info`         — authenticated
+//! - `POST /auth/login`          — public (whitelisted by `framework::middleware::auth`)
+//! - `GET  /auth/code`           — public
+//! - `GET  /auth/tenant/list`    — public
+//! - `POST /auth/refresh-token`  — public
+//! - `POST /auth/logout`         — authenticated
+//! - `GET  /info`                — authenticated
 
 use super::{dto, service};
 use crate::state::AppState;
@@ -64,10 +66,36 @@ pub(crate) async fn get_info(
     Ok(ApiResponse::ok(resp))
 }
 
+#[utoipa::path(get, path = "/auth/tenant/list", tag = "认证",
+    summary = "获取租户列表",
+    responses((status = 200, body = ApiResponse<dto::TenantListForLoginDto>))
+)]
+pub(crate) async fn tenant_list(
+    State(state): State<AppState>,
+) -> Result<ApiResponse<dto::TenantListForLoginDto>, AppError> {
+    let resp = service::tenant_list(&state).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
+#[utoipa::path(post, path = "/auth/refresh-token", tag = "认证",
+    summary = "刷新令牌",
+    request_body = dto::RefreshTokenDto,
+    responses((status = 200, body = ApiResponse<dto::LoginTokenResponseDto>))
+)]
+pub(crate) async fn refresh_token(
+    State(state): State<AppState>,
+    ValidatedJson(dto): ValidatedJson<dto::RefreshTokenDto>,
+) -> Result<ApiResponse<dto::LoginTokenResponseDto>, AppError> {
+    let resp = service::refresh_token(&state, dto).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(login))
         .routes(routes!(get_code))
+        .routes(routes!(tenant_list))
+        .routes(routes!(refresh_token))
         .routes(routes!(logout))
         .routes(routes!(get_info))
 }

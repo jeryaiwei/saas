@@ -139,6 +139,8 @@ fn default_whitelist() -> Vec<String> {
         // API routes under /api/v1 prefix
         format!("POST:{API_PREFIX}/auth/login"),
         format!("GET:{API_PREFIX}/auth/code"),
+        format!("GET:{API_PREFIX}/auth/tenant/list"),
+        format!("POST:{API_PREFIX}/auth/refresh-token"),
         // Infra / docs routes (no prefix)
         "/health".into(),
         "GET:/metrics".into(),

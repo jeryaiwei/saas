@@ -4,12 +4,12 @@ use std::convert::Infallible;
 
 use super::{dto, service};
 use crate::state::AppState;
-use axum::extract::{Path, State};
-use framework::auth::Role;
+use axum::extract::{Extension, Path, State};
+use framework::auth::{JwtClaims, Role};
 use framework::error::AppError;
 use framework::extractors::{ValidatedJson, ValidatedQuery};
 use framework::response::{ApiResponse, Page};
-use framework::{operlog, require_access, require_permission};
+use framework::{operlog, require_access, require_authenticated, require_permission};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
@@ -77,6 +77,54 @@ pub(crate) async fn remove(
     Ok(ApiResponse::success())
 }
 
+#[utoipa::path(get, path = "/system/tenant/select-list", tag = "租户管理",
+    summary = "租户下拉列表",
+    responses((status = 200, body = ApiResponse<Vec<dto::TenantSelectOptionDto>>))
+)]
+pub(crate) async fn select_list(
+    State(state): State<AppState>,
+) -> Result<ApiResponse<Vec<dto::TenantSelectOptionDto>>, AppError> {
+    let resp = service::select_list(&state).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
+#[utoipa::path(get, path = "/system/tenant/dynamic/{tenantId}", tag = "租户管理",
+    summary = "切换租户",
+    params(("tenantId" = String, Path, description = "target tenant id")),
+    responses((status = 200, body = ApiResponse<crate::auth::dto::LoginTokenResponseDto>))
+)]
+pub(crate) async fn dynamic_switch(
+    State(state): State<AppState>,
+    Path(tenant_id): Path<String>,
+    Extension(claims): Extension<JwtClaims>,
+) -> Result<ApiResponse<crate::auth::dto::LoginTokenResponseDto>, AppError> {
+    let resp = service::dynamic_switch(&state, &tenant_id, &claims).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
+#[utoipa::path(get, path = "/system/tenant/dynamic/clear", tag = "租户管理",
+    summary = "恢复默认租户",
+    responses((status = 200, body = ApiResponse<crate::auth::dto::LoginTokenResponseDto>))
+)]
+pub(crate) async fn dynamic_clear(
+    State(state): State<AppState>,
+    Extension(claims): Extension<JwtClaims>,
+) -> Result<ApiResponse<crate::auth::dto::LoginTokenResponseDto>, AppError> {
+    let resp = service::dynamic_clear(&state, &claims).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
+#[utoipa::path(get, path = "/system/tenant/switch-status", tag = "租户管理",
+    summary = "租户切换状态",
+    responses((status = 200, body = ApiResponse<dto::TenantSwitchStatusDto>))
+)]
+pub(crate) async fn switch_status(
+    State(state): State<AppState>,
+) -> Result<ApiResponse<dto::TenantSwitchStatusDto>, AppError> {
+    let resp = service::switch_status(&state).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(create).map(|r| {
@@ -94,6 +142,11 @@ pub fn router() -> OpenApiRouter<AppState> {
             permission: "system:tenant:list",
             role: Role::SuperAdmin,
         }))
+        .routes(routes!(select_list).layer(require_authenticated!()))
+        // literal-prefix routes BEFORE wildcard `/{tenantId}`
+        .routes(routes!(dynamic_clear).layer(require_authenticated!()))
+        .routes(routes!(switch_status).layer(require_authenticated!()))
+        .routes(routes!(dynamic_switch).layer(require_authenticated!()))
         .routes(routes!(find_by_id).layer(require_permission!("system:tenant:query")))
         .routes(routes!(remove).map(|r| {
             r.layer::<_, Infallible>(require_access! {

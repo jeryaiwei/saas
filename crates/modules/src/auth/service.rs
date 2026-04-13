@@ -1,7 +1,8 @@
-//! Auth service — login / logout / get-info business logic.
+//! Auth service — login / logout / get-info / tenant-list / refresh-token business logic.
 
 use super::dto::{
     CaptchaCodeResponseDto, CurrentUserInfoResponseDto, LoginDto, LoginTokenResponseDto,
+    RefreshTokenDto, TenantListForLoginDto, TenantVo,
 };
 use crate::domain::UserRepo;
 use crate::state::AppState;
@@ -188,5 +189,153 @@ pub async fn get_info(
         is_admin: session.is_admin,
         roles: session.roles.clone(),
         permissions: session.permissions.clone(),
+    })
+}
+
+/// Return the list of active tenants for the login page dropdown.
+/// Public — no auth needed.
+#[tracing::instrument(skip_all)]
+pub async fn tenant_list(state: &AppState) -> Result<TenantListForLoginDto, AppError> {
+    if !state.config.tenant.enabled {
+        return Ok(TenantListForLoginDto {
+            tenant_enabled: false,
+            vo_list: Vec::new(),
+        });
+    }
+
+    let rows: Vec<(String, String, Option<String>)> = sqlx::query_as(
+        "SELECT tenant_id, company_name, domain FROM sys_tenant \
+         WHERE status = '0' AND del_flag = '0' \
+         ORDER BY create_at ASC LIMIT 500",
+    )
+    .fetch_all(&state.pg)
+    .await
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("tenant_list: {e}")))?;
+
+    let vo_list = rows
+        .into_iter()
+        .map(|(tenant_id, company_name, domain)| TenantVo {
+            tenant_id,
+            company_name,
+            domain,
+        })
+        .collect();
+
+    Ok(TenantListForLoginDto {
+        tenant_enabled: true,
+        vo_list,
+    })
+}
+
+/// Refresh an access token. Validates the old token, invalidates it, and
+/// issues a new one with recalculated permissions.
+#[tracing::instrument(skip_all)]
+pub async fn refresh_token(
+    state: &AppState,
+    dto: RefreshTokenDto,
+) -> Result<LoginTokenResponseDto, AppError> {
+    // 1. Decode the refresh token JWT
+    let claims = jwt::decode_token(&dto.refresh_token, &state.config.jwt)?;
+
+    // 2. Check single-token blacklist
+    let blacklisted = session::is_blacklisted(&state.redis, &state.config.redis_keys, &claims.uuid)
+        .await
+        .into_internal()?;
+    if blacklisted {
+        return Err(AppError::auth(ResponseCode::TOKEN_INVALID));
+    }
+
+    // 3. Check user-level token version
+    let current_version =
+        session::get_user_token_version(&state.redis, &state.config.redis_keys, &claims.user_id)
+            .await
+            .into_internal()?;
+    if let (Some(current), Some(token_ver)) = (current_version, claims.token_version) {
+        if token_ver < current {
+            return Err(AppError::auth(ResponseCode::TOKEN_INVALID));
+        }
+    }
+
+    // 4. Fetch old session from Redis
+    let old_session = session::fetch(&state.redis, &state.config.redis_keys, &claims.uuid)
+        .await
+        .into_internal()?
+        .ok_or_else(|| AppError::auth(ResponseCode::TOKEN_EXPIRED))?;
+
+    // 5. Delete old session + blacklist old token
+    session::delete(&state.redis, &state.config.redis_keys, &claims.uuid)
+        .await
+        .into_internal()?;
+    session::blacklist(
+        &state.redis,
+        &state.config.redis_keys,
+        &claims.uuid,
+        state.config.redis_ttl.token_blacklist,
+    )
+    .await
+    .into_internal()?;
+
+    // 6. Recalculate permissions
+    let (permissions, is_admin) = match old_session.tenant_id.as_deref() {
+        Some(tid) if old_session.is_admin => {
+            let perms = UserRepo::resolve_all_menu_perms(&state.pg, tid)
+                .await
+                .into_internal()?;
+            (perms, true)
+        }
+        Some(tid) => {
+            let perms = UserRepo::resolve_role_permissions(&state.pg, &old_session.user_id, tid)
+                .await
+                .into_internal()?;
+            (perms, false)
+        }
+        None => (Vec::new(), false),
+    };
+
+    // 7. Build new session + new JWT
+    let new_uuid = uuid::Uuid::new_v4().to_string();
+    let new_session = UserSession {
+        user_id: old_session.user_id.clone(),
+        user_name: old_session.user_name,
+        user_type: old_session.user_type.clone(),
+        tenant_id: old_session.tenant_id.clone(),
+        platform_id: old_session.platform_id,
+        sys_code: old_session.sys_code,
+        lang: old_session.lang,
+        is_admin,
+        permissions,
+        roles: old_session.roles,
+    };
+
+    // 8. Store new session in Redis
+    session::store(
+        &state.redis,
+        &state.config.redis_keys,
+        &new_uuid,
+        &new_session,
+        state.config.jwt.expires_in_sec as u64,
+    )
+    .await
+    .into_internal()?;
+
+    // 9. Sign the new JWT
+    let new_claims = JwtClaims::new(
+        new_uuid,
+        old_session.user_id,
+        old_session.tenant_id,
+        old_session.user_type,
+        current_version,
+        state.config.jwt.expires_in_sec,
+    );
+    let token = jwt::encode_token(&new_claims, &state.config.jwt)?;
+
+    Ok(LoginTokenResponseDto {
+        access_token: token.clone(),
+        refresh_token: Some(token),
+        expire_in: state.config.jwt.expires_in_sec,
+        refresh_expire_in: Some(state.config.jwt.refresh_expires_in_sec),
+        client_id: None,
+        scope: None,
+        openid: None,
     })
 }

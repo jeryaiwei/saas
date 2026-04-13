@@ -12,6 +12,7 @@ framework = { path = "../framework" }
 tokio.workspace = true
 axum.workspace = true
 sqlx.workspace = true
+redis.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

@@ -337,6 +337,75 @@ pub struct AuthRoleUpdateDto {
     pub role_ids: Vec<String>,
 }
 
+// ---------------------------------------------------------------------------
+// Profile / password DTOs
+// ---------------------------------------------------------------------------
+
+/// Response for `GET /system/user/profile`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UserProfileGetResponseDto {
+    pub user_id: String,
+    pub user_name: String,
+    pub nick_name: String,
+    pub email: String,
+    pub phonenumber: String,
+    pub sex: String,
+    pub avatar: String,
+    pub remark: Option<String>,
+}
+
+impl UserProfileGetResponseDto {
+    pub fn from_entity(user: SysUser) -> Self {
+        Self {
+            user_id: user.user_id,
+            user_name: user.user_name,
+            nick_name: user.nick_name,
+            email: user.email,
+            phonenumber: user.phonenumber,
+            sex: user.sex,
+            avatar: user.avatar,
+            remark: user.remark,
+        }
+    }
+}
+
+/// Request body for `PUT /system/user/profile`.
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProfileDto {
+    #[validate(length(max = 30))]
+    pub nick_name: Option<String>,
+    #[validate(length(max = 50))]
+    pub email: Option<String>,
+    #[validate(length(max = 11))]
+    pub phonenumber: Option<String>,
+    #[validate(custom(function = "validate_sex_flag"))]
+    pub sex: Option<String>,
+}
+
+/// Request body for `PUT /system/user/profile/update-pwd`.
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdatePwdDto {
+    #[validate(length(min = 1))]
+    pub old_password: String,
+    #[validate(length(min = 6, max = 20))]
+    pub new_password: String,
+}
+
+/// Department tree node for `GET /system/user/dept-tree`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(no_recursion)]
+#[serde(rename_all = "camelCase")]
+pub struct DeptTreeNodeDto {
+    pub id: String,
+    pub label: String,
+    pub parent_id: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<DeptTreeNodeDto>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

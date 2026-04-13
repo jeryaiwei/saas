@@ -1,7 +1,7 @@
 //! Entity structs — `#[derive(FromRow)]` for sqlx query mapping.
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// Full `sys_user` row. Mirrors the DB schema including the bcrypt
@@ -488,4 +488,25 @@ pub struct SysMailLog {
     pub send_status: i32,
     pub send_time: Option<DateTime<Utc>>,
     pub error_msg: Option<String>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct SysAuditLog {
+    pub id: String,
+    pub tenant_id: String,
+    pub user_id: Option<String>,
+    pub user_name: Option<String>,
+    pub action: String,
+    pub module: String,
+    pub target_type: Option<String>,
+    pub target_id: Option<String>,
+    pub old_value: Option<String>,
+    pub new_value: Option<String>,
+    pub ip: String,
+    pub user_agent: Option<String>,
+    pub request_id: Option<String>,
+    pub status: String,
+    pub error_msg: Option<String>,
+    pub duration: i32,
+    pub create_at: DateTime<Utc>,
 }

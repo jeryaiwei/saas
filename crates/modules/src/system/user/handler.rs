@@ -154,6 +154,54 @@ pub(crate) async fn update_auth_role(
     Ok(ApiResponse::success())
 }
 
+#[utoipa::path(get, path = "/system/user/profile", tag = "用户管理",
+    summary = "获取当前用户资料",
+    responses((status = 200, body = ApiResponse<dto::UserProfileGetResponseDto>))
+)]
+pub(crate) async fn get_profile(
+    State(state): State<AppState>,
+) -> Result<ApiResponse<dto::UserProfileGetResponseDto>, AppError> {
+    let resp = service::get_profile(&state).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
+#[utoipa::path(put, path = "/system/user/profile", tag = "用户管理",
+    summary = "修改当前用户资料",
+    request_body = dto::UpdateProfileDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update_profile(
+    State(state): State<AppState>,
+    ValidatedJson(dto): ValidatedJson<dto::UpdateProfileDto>,
+) -> Result<ApiResponse<()>, AppError> {
+    service::update_profile(&state, dto).await?;
+    Ok(ApiResponse::success())
+}
+
+#[utoipa::path(put, path = "/system/user/profile/update-pwd", tag = "用户管理",
+    summary = "修改密码",
+    request_body = dto::UpdatePwdDto,
+    responses((status = 200, description = "success"))
+)]
+pub(crate) async fn update_pwd(
+    State(state): State<AppState>,
+    ValidatedJson(dto): ValidatedJson<dto::UpdatePwdDto>,
+) -> Result<ApiResponse<()>, AppError> {
+    service::update_pwd(&state, dto).await?;
+    Ok(ApiResponse::success())
+}
+
+#[utoipa::path(get, path = "/system/user/dept-tree", tag = "用户管理",
+    summary = "部门树",
+    responses((status = 200, body = ApiResponse<Vec<dto::DeptTreeNodeDto>>))
+)]
+pub(crate) async fn dept_tree(
+    State(state): State<AppState>,
+) -> Result<ApiResponse<Vec<dto::DeptTreeNodeDto>>, AppError> {
+    let resp = service::dept_tree(&state).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(create).map(|r| {
@@ -167,6 +215,10 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(list).layer(require_permission!("system:user:list")))
         .routes(routes!(option_select).layer(require_authenticated!()))
         .routes(routes!(info).layer(require_authenticated!()))
+        // Profile routes — must come before /{id} wildcard
+        .routes(routes!(get_profile, update_profile).layer(require_authenticated!()))
+        .routes(routes!(update_pwd).layer(require_authenticated!()))
+        .routes(routes!(dept_tree).layer(require_authenticated!()))
         .routes(routes!(change_status).map(|r| {
             r.layer::<_, Infallible>(require_role!(Role::TenantAdmin))
                 .layer(operlog!("用户管理", Update))

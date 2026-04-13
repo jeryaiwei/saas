@@ -90,9 +90,16 @@ impl ResponseCode {
     pub const SMS_TEMPLATE_NOT_FOUND: Self = Self(7160);
     pub const SMS_TEMPLATE_CODE_EXISTS: Self = Self(7161);
 
+    // --- 3030-3039 user profile ---
+    pub const OLD_PASSWORD_INCORRECT: Self = Self(3030);
+
+    // --- 4030-4039 tenant switch ---
+    pub const TENANT_BINDING_NOT_FOUND: Self = Self(4030);
+
     // --- 7200-7299 monitor module ---
     pub const OPER_LOG_NOT_FOUND: Self = Self(7200);
     pub const LOGIN_LOG_NOT_FOUND: Self = Self(7210);
+    pub const AUDIT_LOG_NOT_FOUND: Self = Self(7220);
 
     pub const fn as_i32(self) -> i32 {
         self.0

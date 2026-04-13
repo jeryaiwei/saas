@@ -1625,6 +1625,7 @@ dependencies = [
  "chrono",
  "framework",
  "metrics-exporter-prometheus",
+ "redis",
  "serde",
  "serde_json",
  "sqlx",

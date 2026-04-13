@@ -2,7 +2,7 @@
 
 use super::dto::{
     CreateTenantDto, ListTenantDto, TenantDetailResponseDto, TenantListItemResponseDto,
-    UpdateTenantDto,
+    TenantSelectOptionDto, TenantSwitchStatusDto, UpdateTenantDto,
 };
 use crate::domain::constants::SUPER_TENANT_ID;
 use crate::domain::{
@@ -11,6 +11,8 @@ use crate::domain::{
 };
 use crate::state::AppState;
 use anyhow::Context;
+use framework::auth::{jwt, session, JwtClaims, UserSession};
+use framework::context::RequestContext;
 use framework::error::{AppError, BusinessCheckBool, BusinessCheckOption, IntoAppError};
 use framework::infra::crypto::hash_password;
 use framework::response::{ApiResponse, Page, ResponseCode};
@@ -358,4 +360,203 @@ pub async fn remove(state: &AppState, path_ids: &str) -> Result<(), AppError> {
         .into_internal()?;
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Tenant select-list / switch / clear / switch-status
+// ---------------------------------------------------------------------------
+
+/// Return list of tenants the current user can switch to.
+/// Super admin: all active tenants. Normal user: tenants from sys_user_tenant.
+#[tracing::instrument(skip_all)]
+pub async fn select_list(state: &AppState) -> Result<Vec<TenantSelectOptionDto>, AppError> {
+    let user_id = RequestContext::with_current(|ctx| ctx.user_id.clone())
+        .flatten()
+        .or_business(ResponseCode::TOKEN_EXPIRED)?;
+
+    let is_admin = RequestContext::with_current(|ctx| ctx.is_admin).unwrap_or(false);
+
+    if is_admin {
+        // Super/platform admin: all active tenants
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT tenant_id, company_name FROM sys_tenant \
+             WHERE status = '0' AND del_flag = '0' \
+             ORDER BY create_at ASC LIMIT 500",
+        )
+        .fetch_all(&state.pg)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("select_list all: {e}")))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(tenant_id, company_name)| TenantSelectOptionDto {
+                tenant_id,
+                company_name,
+            })
+            .collect())
+    } else {
+        // Normal user: tenants from sys_user_tenant bindings
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT t.tenant_id, t.company_name \
+             FROM sys_user_tenant ut \
+             JOIN sys_tenant t ON t.tenant_id = ut.tenant_id \
+             WHERE ut.user_id = $1 \
+               AND ut.status = '0' \
+               AND t.status = '0' \
+               AND t.del_flag = '0' \
+             ORDER BY t.create_at ASC",
+        )
+        .bind(&user_id)
+        .fetch_all(&state.pg)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("select_list user: {e}")))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(tenant_id, company_name)| TenantSelectOptionDto {
+                tenant_id,
+                company_name,
+            })
+            .collect())
+    }
+}
+
+/// Helper: rebuild session + JWT for a target tenant.
+async fn switch_to_tenant(
+    state: &AppState,
+    user_id: &str,
+    target_tenant_id: &str,
+    claims: &JwtClaims,
+) -> Result<crate::auth::dto::LoginTokenResponseDto, AppError> {
+    // Verify user has binding to target tenant
+    let user_tenants = UserRepo::find_user_tenants(&state.pg, user_id)
+        .await
+        .into_internal()?;
+    let binding = user_tenants
+        .iter()
+        .find(|t| t.tenant_id == target_tenant_id)
+        .ok_or_else(|| AppError::business(ResponseCode::TENANT_BINDING_NOT_FOUND))?;
+
+    let is_admin = binding.is_admin_flag();
+
+    // Recalculate permissions for target tenant
+    let permissions = if is_admin {
+        UserRepo::resolve_all_menu_perms(&state.pg, target_tenant_id)
+            .await
+            .into_internal()?
+    } else {
+        UserRepo::resolve_role_permissions(&state.pg, user_id, target_tenant_id)
+            .await
+            .into_internal()?
+    };
+
+    // Get old session
+    let old_session = session::fetch(&state.redis, &state.config.redis_keys, &claims.uuid)
+        .await
+        .into_internal()?
+        .or_business(ResponseCode::TOKEN_EXPIRED)?;
+
+    // Update Redis session
+    let new_session = UserSession {
+        user_id: old_session.user_id.clone(),
+        user_name: old_session.user_name,
+        user_type: old_session.user_type.clone(),
+        tenant_id: Some(target_tenant_id.to_string()),
+        platform_id: old_session.platform_id,
+        sys_code: old_session.sys_code,
+        lang: old_session.lang,
+        is_admin,
+        permissions,
+        roles: old_session.roles,
+    };
+
+    session::store(
+        &state.redis,
+        &state.config.redis_keys,
+        &claims.uuid,
+        &new_session,
+        state.config.jwt.expires_in_sec as u64,
+    )
+    .await
+    .into_internal()?;
+
+    // Return new LoginTokenResponseDto — reuse existing token since session
+    // is stored under the same uuid
+    let new_claims = JwtClaims::new(
+        &claims.uuid,
+        &old_session.user_id,
+        Some(target_tenant_id.to_string()),
+        old_session.user_type,
+        claims.token_version,
+        state.config.jwt.expires_in_sec,
+    );
+    let token = jwt::encode_token(&new_claims, &state.config.jwt)?;
+
+    Ok(crate::auth::dto::LoginTokenResponseDto {
+        access_token: token.clone(),
+        refresh_token: Some(token),
+        expire_in: state.config.jwt.expires_in_sec,
+        refresh_expire_in: Some(state.config.jwt.refresh_expires_in_sec),
+        client_id: None,
+        scope: None,
+        openid: None,
+    })
+}
+
+/// Switch to a specific tenant.
+#[tracing::instrument(skip_all, fields(target_tenant_id = %target_tenant_id))]
+pub async fn dynamic_switch(
+    state: &AppState,
+    target_tenant_id: &str,
+    claims: &JwtClaims,
+) -> Result<crate::auth::dto::LoginTokenResponseDto, AppError> {
+    switch_to_tenant(state, &claims.user_id, target_tenant_id, claims).await
+}
+
+/// Restore to default tenant.
+#[tracing::instrument(skip_all)]
+pub async fn dynamic_clear(
+    state: &AppState,
+    claims: &JwtClaims,
+) -> Result<crate::auth::dto::LoginTokenResponseDto, AppError> {
+    let user_tenants = UserRepo::find_user_tenants(&state.pg, &claims.user_id)
+        .await
+        .into_internal()?;
+
+    let default_binding = user_tenants
+        .iter()
+        .find(|t| t.is_default_flag())
+        .or_else(|| user_tenants.first())
+        .ok_or_else(|| AppError::business(ResponseCode::TENANT_BINDING_NOT_FOUND))?;
+
+    switch_to_tenant(state, &claims.user_id, &default_binding.tenant_id, claims).await
+}
+
+/// Return current tenant switch status.
+#[tracing::instrument(skip_all)]
+pub async fn switch_status(state: &AppState) -> Result<TenantSwitchStatusDto, AppError> {
+    let user_id = RequestContext::with_current(|ctx| ctx.user_id.clone())
+        .flatten()
+        .or_business(ResponseCode::TOKEN_EXPIRED)?;
+    let current_tenant_id = RequestContext::with_current(|ctx| ctx.tenant_id.clone()).flatten();
+
+    let user_tenants = UserRepo::find_user_tenants(&state.pg, &user_id)
+        .await
+        .into_internal()?;
+
+    let default_tenant_id = user_tenants
+        .iter()
+        .find(|t| t.is_default_flag())
+        .map(|t| t.tenant_id.clone());
+
+    let is_switched = match (&current_tenant_id, &default_tenant_id) {
+        (Some(current), Some(default)) => current != default,
+        _ => false,
+    };
+
+    Ok(TenantSwitchStatusDto {
+        current_tenant_id,
+        default_tenant_id,
+        is_switched,
+    })
 }

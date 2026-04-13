@@ -3,6 +3,7 @@
 //! Audit + tenant-scope helpers live in `framework::context`
 //! (pure `RequestContext` readers with no domain knowledge).
 
+pub mod audit_log_repo;
 pub mod config_repo;
 pub mod constants;
 pub mod dept_repo;
@@ -28,6 +29,7 @@ pub mod tenant_repo;
 pub mod user_repo;
 pub mod validators;
 
+pub use audit_log_repo::{AuditLogListFilter, AuditLogRepo};
 pub use config_repo::{ConfigInsertParams, ConfigListFilter, ConfigRepo, ConfigUpdateParams};
 pub use dept_repo::{DeptInsertParams, DeptListFilter, DeptRepo, DeptUpdateParams};
 pub use dict_data_repo::{
@@ -37,10 +39,10 @@ pub use dict_type_repo::{
     DictTypeInsertParams, DictTypeListFilter, DictTypeRepo, DictTypeUpdateParams,
 };
 pub use entities::{
-    SysConfig, SysDept, SysDictData, SysDictType, SysLogininfor, SysMailAccount, SysMailLog,
-    SysMailTemplate, SysMenu, SysNotice, SysNotifyMessage, SysNotifyTemplate, SysOperLog, SysPost,
-    SysRole, SysSmsChannel, SysSmsLog, SysSmsTemplate, SysTenant, SysTenantPackage, SysUser,
-    SysUserTenant,
+    SysAuditLog, SysConfig, SysDept, SysDictData, SysDictType, SysLogininfor, SysMailAccount,
+    SysMailLog, SysMailTemplate, SysMenu, SysNotice, SysNotifyMessage, SysNotifyTemplate,
+    SysOperLog, SysPost, SysRole, SysSmsChannel, SysSmsLog, SysSmsTemplate, SysTenant,
+    SysTenantPackage, SysUser, SysUserTenant,
 };
 pub use login_log_repo::{LoginLogListFilter, LoginLogRepo};
 pub use mail_account_repo::{
