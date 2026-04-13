@@ -68,6 +68,18 @@ pub trait RedisExt {
     /// GET raw string value.
     async fn get_raw(&self, key: &str) -> anyhow::Result<Option<String>>;
 
+    /// Check if key exists.
+    async fn exists(&self, key: &str) -> anyhow::Result<bool>;
+
+    /// INCR key by 1. Returns the new value.
+    async fn incr(&self, key: &str) -> anyhow::Result<i64>;
+
+    /// Set TTL (seconds) on an existing key.
+    async fn expire(&self, key: &str, ttl_secs: u64) -> anyhow::Result<()>;
+
+    /// INCR key and set TTL. Returns the new value.
+    async fn incr_ex(&self, key: &str, ttl_secs: u64) -> anyhow::Result<i64>;
+
     /// DELETE key.
     async fn del(&self, key: &str) -> anyhow::Result<()>;
 }
@@ -141,6 +153,52 @@ impl RedisExt for RedisPool {
             .query_async(&mut *conn)
             .await
             .map_err(|e| anyhow::anyhow!("redis GET: {e}"))?;
+        Ok(val)
+    }
+
+    async fn exists(&self, key: &str) -> anyhow::Result<bool> {
+        let mut conn = self
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("redis get conn: {e}"))?;
+        let val: i64 = redis::cmd("EXISTS")
+            .arg(key)
+            .query_async(&mut *conn)
+            .await
+            .map_err(|e| anyhow::anyhow!("redis EXISTS: {e}"))?;
+        Ok(val > 0)
+    }
+
+    async fn incr(&self, key: &str) -> anyhow::Result<i64> {
+        let mut conn = self
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("redis get conn: {e}"))?;
+        let val: i64 = redis::cmd("INCR")
+            .arg(key)
+            .query_async(&mut *conn)
+            .await
+            .map_err(|e| anyhow::anyhow!("redis INCR: {e}"))?;
+        Ok(val)
+    }
+
+    async fn expire(&self, key: &str, ttl_secs: u64) -> anyhow::Result<()> {
+        let mut conn = self
+            .get()
+            .await
+            .map_err(|e| anyhow::anyhow!("redis get conn: {e}"))?;
+        let _: () = redis::cmd("EXPIRE")
+            .arg(key)
+            .arg(ttl_secs)
+            .query_async(&mut *conn)
+            .await
+            .map_err(|e| anyhow::anyhow!("redis EXPIRE: {e}"))?;
+        Ok(())
+    }
+
+    async fn incr_ex(&self, key: &str, ttl_secs: u64) -> anyhow::Result<i64> {
+        let val = self.incr(key).await?;
+        self.expire(key, ttl_secs).await?;
         Ok(val)
     }
 

@@ -13,7 +13,6 @@
 
 use crate::config::RedisKeyConfig;
 use crate::infra::redis::{RedisExt, RedisPool};
-use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -92,7 +91,7 @@ pub async fn is_blacklisted(
     uuid: &str,
 ) -> anyhow::Result<bool> {
     let key = format!("{}{}", keys.token_blacklist, uuid);
-    Ok(pool.get_raw(&key).await?.is_some())
+    pool.exists(&key).await
 }
 
 /// Read the current per-user token version (used to invalidate all tokens
@@ -122,21 +121,9 @@ pub async fn bump_user_token_version(
     user_id: &str,
 ) -> anyhow::Result<i64> {
     let key = format!("{}{}", keys.user_token_version, user_id);
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let new_ver: i64 = redis::cmd("INCR")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .context("redis INCR token version")?;
-    // Extend TTL to 7 days (604800 seconds) so stale counters get garbage
-    // collected after all tokens they could possibly apply to have expired.
-    let _: () = redis::cmd("EXPIRE")
-        .arg(&key)
-        .arg(604800)
-        .query_async(&mut conn)
-        .await
-        .context("redis EXPIRE token version")?;
-    Ok(new_ver)
+    // INCR + set 7-day TTL so stale counters get garbage collected
+    // after all tokens they could possibly apply to have expired.
+    pool.incr_ex(&key, 604800).await
 }
 
 // ─── Tenant switch original state ────────────────────────────────────────

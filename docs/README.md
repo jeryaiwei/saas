@@ -4,8 +4,8 @@
 
 | 指标     | 值                                                                                                                                                     |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 端点数   | 188 (system 84 + message 55 + monitor 13 + auth 6 + health 9)                                                                                          |
-| 模块数   | 30 (system 12 + message 11 + monitor 5 + auth 1 + health 1)                                                                                            |
+| 端点数   | 192 (system 88 + message 55 + monitor 13 + auth 6 + health 9 + common 4 + file 17)                                                                     |
+| 模块数   | 31 (system 12 + message 11 + monitor 5 + auth 1 + health 1 + upload 1)                                                                                 |
 | 测试数   | 326                                                                                                                                                    |
 | Smoke    | 12 scripts, 119 steps (role 14 + user 16 + tenant 13 + menu 10 + dept 8 + post 8 + config 9 + dict 11 + notice 7 + notify 12 + operlog 6 + loginlog 5) |
 | 框架规范 | 8 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog / tenant)                                   |
@@ -47,13 +47,15 @@
 server-rs/
 ├── crates/
 │   ├── framework/     跨切面基础设施 (config, context, error, extractors,
-│   │                  i18n, infra, middleware, response, telemetry, testing)
+│   │                  i18n, infra[pg,redis,smtp,storage,crypto,captcha],
+│   │                  middleware, response, telemetry, testing)
 │   ├── modules/       业务模块
-│   │                  system/ (config,dept,dict,menu,post,role,tenant,tenant_package,user)
-│   │                  system/ + (audit_log, file_manager, tenant_dashboard)
-│   │                  message/ (notice,notify_template,notify_message,mail_account,
-│   │                           mail_template,mail_log,mail_send,sms_channel,
-│   │                           sms_template,sms_log,sms_send)
+│   │                  system/ (config,dept,dict,menu,post,role,tenant,
+│   │                           tenant_package,tenant_dashboard,user,
+│   │                           audit_log,file_manager,upload[local/oss/cos])
+│   │                  message/ (notice,notify_template,notify_message,
+│   │                           mail_account,mail_template,mail_log,mail_send,
+│   │                           sms_channel,sms_template,sms_log,sms_send)
 │   │                  monitor/ (oper_log,login_log,online_user,server_info,cache)
 │   │                  + auth/ + health/ + domain/ (28 repos) + openapi.rs
 │   └── app/           二进制入口 (main.rs, middleware 组装, swagger-ui, CORS)
@@ -183,5 +185,5 @@ git push github main
 
 ## 下一步
 
-1. **Vue Web 灰度切换** — 188 端点覆盖管理端，改 proxy target 即可
+1. **Vue Web 灰度切换** — 192 端点覆盖管理端，改 proxy target 即可
 2. **腾讯/华为 SMS 真实接入** — 替换 mock client
