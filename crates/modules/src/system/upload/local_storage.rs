@@ -1,17 +1,22 @@
 //! Local filesystem storage provider.
 
 use async_trait::async_trait;
-use framework::infra::storage::StorageProvider;
+use framework::{
+    config::LocalStorageConfig,
+    infra::storage::{PutResult, StorageProvider},
+};
 use std::path::PathBuf;
 
 pub struct LocalStorageProvider {
     base_dir: PathBuf,
+    domain: String,
 }
 
 impl LocalStorageProvider {
-    pub fn new(base_dir: &str) -> Self {
+    pub fn new(local: &LocalStorageConfig) -> Self {
         Self {
-            base_dir: PathBuf::from(base_dir),
+            base_dir: PathBuf::from(local.upload_dir.clone()),
+            domain: local.domain.clone()
         }
     }
 
@@ -38,7 +43,7 @@ impl LocalStorageProvider {
 
 #[async_trait]
 impl StorageProvider for LocalStorageProvider {
-    async fn put(&self, key: &str, data: &[u8], _content_type: &str) -> Result<String, String> {
+    async fn put(&self, key: &str, data: &[u8], _content_type: &str) -> Result<PutResult, String> {
         let path = self.safe_path(key)?;
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent)
@@ -48,7 +53,11 @@ impl StorageProvider for LocalStorageProvider {
         tokio::fs::write(&path, data)
             .await
             .map_err(|e| format!("write: {e}"))?;
-        Ok(key.to_string())
+        let url = format!("{}/{}", self.domain.trim_end_matches('/'), key);
+        Ok(PutResult {
+            key: key.to_string(),
+            url,
+        })
     }
 
     async fn get(&self, key: &str) -> Result<Vec<u8>, String> {

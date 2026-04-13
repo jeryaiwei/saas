@@ -24,7 +24,10 @@ use framework::{
     },
     telemetry,
 };
-use modules::system::upload::local_storage::LocalStorageProvider;
+use modules::system::upload::{
+    cos_storage::CosStorageProvider, local_storage::LocalStorageProvider,
+    oss_storage::OssStorageProvider,
+};
 use modules::AppState;
 use regex::Regex;
 use std::{sync::Arc, time::Duration};
@@ -69,7 +72,23 @@ async fn main() -> anyhow::Result<()> {
     // 5. Compose shared AppState
     let (mail_sem, sms_sem) = AppState::new_semaphores();
     let storage: Arc<dyn framework::infra::storage::StorageProvider> =
-        Arc::new(LocalStorageProvider::new(&cfg.upload.upload_dir));
+        match cfg.upload.storage_type.as_str() {
+            "oss" => {
+                let oss_cfg = cfg.upload.oss.as_ref()
+                    .expect("upload.oss config required when storage_type = oss");
+                Arc::new(OssStorageProvider::new(oss_cfg))
+            }
+            "cos" => {
+                let cos_cfg = cfg.upload.cos.as_ref()
+                    .expect("upload.cos config required when storage_type = cos");
+                Arc::new(CosStorageProvider::new(cos_cfg))
+            }
+            _ => {
+                let local_cfg = cfg.upload.local.as_ref()
+                    .expect("upload.local config required when storage_type = local");
+                Arc::new(LocalStorageProvider::new(local_cfg))
+            }
+        };
     let state = AppState {
         config: cfg.clone(),
         pg: pg_pool,

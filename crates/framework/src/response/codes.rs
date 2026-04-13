@@ -69,6 +69,9 @@ impl ResponseCode {
     pub const FILE_SIZE_EXCEEDED: Self = Self(5040);
     pub const FILE_TYPE_NOT_ALLOWED: Self = Self(5041);
     pub const FILE_UPLOAD_FAIL: Self = Self(5042);
+    pub const CLIENT_UPLOAD_NOT_SUPPORTED: Self = Self(5050);
+    pub const UPLOAD_TOKEN_INVALID: Self = Self(5051);
+    pub const UPLOAD_TOKEN_USED: Self = Self(5052);
 
     // --- 7000-7099 system module ---
     pub const DEPT_NOT_FOUND: Self = Self(7010);

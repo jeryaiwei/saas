@@ -53,7 +53,11 @@ pub async fn build_state_and_router() -> (AppState, Router) {
     let redis_pool = redis::build(&cfg.db.redis).expect("redis pool");
 
     let (mail_sem, sms_sem) = AppState::new_semaphores();
-    let storage: Arc<dyn StorageProvider> = Arc::new(LocalStorageProvider::new("./test-uploads"));
+    let test_local_cfg = framework::config::LocalStorageConfig {
+        upload_dir: "./test-uploads".into(),
+        domain: "http://localhost:18080".into(),
+    };
+    let storage: Arc<dyn StorageProvider> = Arc::new(LocalStorageProvider::new(&test_local_cfg));
     let state = AppState {
         config: cfg,
         pg: pg_pool,

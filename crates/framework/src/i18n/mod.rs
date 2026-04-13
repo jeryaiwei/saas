@@ -257,6 +257,10 @@ mod tests {
             ResponseCode::FILE_SIZE_EXCEEDED,
             ResponseCode::FILE_TYPE_NOT_ALLOWED,
             ResponseCode::FILE_UPLOAD_FAIL,
+            // 5050-5052 client direct upload
+            ResponseCode::CLIENT_UPLOAD_NOT_SUPPORTED,
+            ResponseCode::UPLOAD_TOKEN_INVALID,
+            ResponseCode::UPLOAD_TOKEN_USED,
             // 7000-7099 system module
             ResponseCode::DEPT_NOT_FOUND,
             ResponseCode::DEPT_PARENT_NOT_FOUND,

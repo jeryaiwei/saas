@@ -6,9 +6,9 @@ use axum::extract::{DefaultBodyLimit, Multipart, Path, State};
 use axum::http::header;
 use axum::response::IntoResponse;
 use framework::error::AppError;
+use framework::extractors::ValidatedJson;
 use framework::response::{ApiResponse, ResponseCode};
-use framework::{operlog, require_authenticated, require_permission};
-use std::convert::Infallible;
+use framework::{operlog, require_authenticated};
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
@@ -86,6 +86,32 @@ pub(crate) async fn download(
     ))
 }
 
+#[utoipa::path(post, path = "/common/upload/client/authorization", tag = "文件上传",
+    summary = "客户端直传授权",
+    request_body = dto::ClientUploadAuthDto,
+    responses((status = 200, body = ApiResponse<dto::ClientUploadAuthResponseDto>))
+)]
+pub(crate) async fn client_authorize(
+    State(state): State<AppState>,
+    ValidatedJson(dto): ValidatedJson<dto::ClientUploadAuthDto>,
+) -> Result<ApiResponse<dto::ClientUploadAuthResponseDto>, AppError> {
+    let resp = service::client_authorize(&state, dto).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
+#[utoipa::path(post, path = "/common/upload/client/callback", tag = "文件上传",
+    summary = "客户端直传回调",
+    request_body = dto::ClientUploadCallbackDto,
+    responses((status = 200, body = ApiResponse<dto::ClientUploadCallbackResponseDto>))
+)]
+pub(crate) async fn client_callback(
+    State(state): State<AppState>,
+    ValidatedJson(dto): ValidatedJson<dto::ClientUploadCallbackDto>,
+) -> Result<ApiResponse<dto::ClientUploadCallbackResponseDto>, AppError> {
+    let resp = service::client_callback(&state, dto).await?;
+    Ok(ApiResponse::ok(resp))
+}
+
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(upload).map(|r| {
@@ -94,4 +120,6 @@ pub fn router() -> OpenApiRouter<AppState> {
         // Body limit: 100MB + 1MB overhead for multipart framing
         .layer(DefaultBodyLimit::max(101 * 1024 * 1024))
         .routes(routes!(download).layer(require_authenticated!()))
+        .routes(routes!(client_authorize).layer(require_authenticated!()))
+        .routes(routes!(client_callback).layer(require_authenticated!()))
 }

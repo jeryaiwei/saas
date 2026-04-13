@@ -45,8 +45,20 @@ mail:
 
 upload:
   storage_type: "local"
-  upload_dir: "./uploads"
   max_file_size_mb: 100
+  allowed_types: []              # empty = allow all MIME types
+  blocked_extensions:            # dangerous executable extensions
+    - exe
+    - bat
+    - cmd
+    - sh
+    - ps1
+    - msi
+    - dll
+    - com
+    - scr
+  local:
+    upload_dir: "./uploads"
 
 # TTLs in seconds — MUST match NestJS values
 redis_ttl:

@@ -231,25 +231,107 @@ fn default_mail_password_key() -> String {
 pub struct UploadConfig {
     #[serde(default = "default_storage_type")]
     pub storage_type: String,
-    #[serde(default = "default_upload_dir")]
-    pub upload_dir: String,
     #[serde(default = "default_max_file_size_mb")]
     pub max_file_size_mb: u64,
+    /// Allowed MIME types (whitelist). Empty = allow all.
+    #[serde(default)]
+    pub allowed_types: Vec<String>,
+    /// Blocked file extensions (blacklist). e.g. ["exe","bat","sh"]
+    #[serde(default)]
+    pub blocked_extensions: Vec<String>,
+    /// Local storage config (only needed when storage_type = "local")
+    #[serde(default)]
+    pub local: Option<LocalStorageConfig>,
+    /// OSS config (only needed when storage_type = "oss")
+    #[serde(default)]
+    pub oss: Option<OssConfig>,
+    /// COS config (only needed when storage_type = "cos")
+    #[serde(default)]
+    pub cos: Option<CosConfig>,
 }
 
 impl Default for UploadConfig {
     fn default() -> Self {
         Self {
             storage_type: default_storage_type(),
-            upload_dir: default_upload_dir(),
             max_file_size_mb: default_max_file_size_mb(),
+            allowed_types: vec![],
+            blocked_extensions: vec![],
+            local: None,
+            oss: None,
+            cos: None,
         }
+    }
+}
+
+ 
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LocalStorageConfig {
+    #[serde(default = "default_upload_dir")]
+    pub upload_dir: String,
+    #[serde(default="default_upload_domain")]
+    pub domain:String,
+}
+ 
+#[derive(Clone, Deserialize)]
+pub struct OssConfig {
+    pub access_key_id: String,
+    pub access_key_secret: String,
+    pub bucket: String,
+    pub region: String,
+    /// Custom endpoint (overrides default `https://{bucket}.{region}.aliyuncs.com`)
+    pub endpoint: Option<String>,
+    /// Custom access domain for URL generation
+    pub domain: Option<String>,
+    /// Storage path prefix (e.g. "uploads")
+    #[serde(default)]
+    pub location: String,
+}
+
+impl std::fmt::Debug for OssConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OssConfig")
+            .field("bucket", &self.bucket)
+            .field("region", &self.region)
+            .field("access_key_id", &"******")
+            .field("access_key_secret", &"******")
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone, Deserialize)]
+pub struct CosConfig {
+    pub secret_id: String,
+    pub secret_key: String,
+    pub bucket: String,
+    pub region: String,
+    /// Custom access domain
+    pub domain: Option<String>,
+    /// Storage path prefix
+    #[serde(default)]
+    pub location: String,
+}
+
+impl std::fmt::Debug for CosConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CosConfig")
+            .field("bucket", &self.bucket)
+            .field("region", &self.region)
+            .field("secret_id", &"******")
+            .field("secret_key", &"******")
+            .finish_non_exhaustive()
     }
 }
 
 fn default_storage_type() -> String {
     "local".into()
 }
+
+fn default_upload_domain() ->String {
+    "http://localhost".into()
+}
+
 fn default_upload_dir() -> String {
     "./uploads".into()
 }
