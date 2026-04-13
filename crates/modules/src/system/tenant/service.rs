@@ -156,13 +156,21 @@ pub async fn create(state: &AppState, dto: CreateTenantDto) -> Result<ApiRespons
         created_tenant_ids.push(tenant_id);
     }
 
-    // 10. Create admin user
+    // 10. Create admin user — platform_id 取决于父租户类型
+    //     创建平台 (parent=超级) → platform_id = SUPER_TENANT_ID
+    //     创建一般 (parent=平台) → platform_id = 平台的 tenant_id
+    let admin_platform_id = dto
+        .parent_id
+        .clone()
+        .unwrap_or_else(|| SUPER_TENANT_ID.to_string());
+
     let user = UserRepo::insert(
         &mut *tx,
         UserInsertParams {
             user_name: dto.username,
             nick_name: "租户管理员".into(),
             password_hash,
+            platform_id: admin_platform_id,
             dept_id: None,
             email: String::new(),
             phonenumber: String::new(),

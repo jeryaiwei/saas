@@ -143,12 +143,18 @@ pub async fn create(
         .context("create: begin tx")
         .into_internal()?;
 
+    // platform_id 从当前操作者的 context 继承
+    let platform_id = RequestContext::with_current(|c| c.platform_id.clone())
+        .flatten()
+        .unwrap_or_else(|| framework::constants::PLATFORM_ID_DEFAULT.to_string());
+
     let user = UserRepo::insert(
         &mut *tx,
         UserInsertParams {
             user_name: dto.user_name,
             nick_name: dto.nick_name,
             password_hash,
+            platform_id,
             dept_id: dto.dept_id,
             email: dto.email,
             phonenumber: dto.phonenumber,
@@ -261,7 +267,21 @@ pub async fn change_status(state: &AppState, dto: ChangeUserStatusDto) -> Result
     let affected = UserRepo::change_status(&state.pg, &dto.user_id, &dto.status)
         .await
         .into_internal()?;
-    (affected == 0).business_err_if(ResponseCode::DATA_NOT_FOUND)
+    (affected == 0).business_err_if(ResponseCode::DATA_NOT_FOUND)?;
+
+    // 停用时注销该用户所有 token
+    if dto.status == "1" {
+        if let Err(e) = framework::auth::session::bump_user_token_version(
+            &state.redis,
+            &state.config.redis_keys,
+            &dto.user_id,
+        )
+        .await
+        {
+            tracing::warn!(error = %e, user_id = %dto.user_id, "token version bump failed after user disabled");
+        }
+    }
+    Ok(())
 }
 
 /// Soft-delete one or more users. NestJS accepts a comma-separated list
@@ -304,6 +324,15 @@ pub async fn remove(state: &AppState, path_ids: &str) -> Result<(), AppError> {
         .into_internal()?;
 
     for id in &ids {
+        // 清理角色绑定
+        sqlx::query("DELETE FROM sys_user_role WHERE user_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .context("remove: delete sys_user_role")
+            .into_internal()?;
+
+        // 软删除用户
         let affected = UserRepo::soft_delete_by_id(&mut *tx, id)
             .await
             .into_internal()?;
@@ -314,6 +343,19 @@ pub async fn remove(state: &AppState, path_ids: &str) -> Result<(), AppError> {
         .await
         .context("remove: commit tx")
         .into_internal()?;
+
+    // 注销已删除用户的 token（事务外，best-effort）
+    for id in &ids {
+        if let Err(e) = framework::auth::session::bump_user_token_version(
+            &state.redis,
+            &state.config.redis_keys,
+            id,
+        )
+        .await
+        {
+            tracing::warn!(error = %e, user_id = %id, "token version bump failed after user deleted");
+        }
+    }
 
     Ok(())
 }
@@ -447,6 +489,18 @@ pub async fn update_auth_role(state: &AppState, dto: AuthRoleUpdateDto) -> Resul
         .await
         .context("update_auth_role: commit tx")
         .into_internal()?;
+
+    // Bump token version — forces next request to re-authenticate,
+    // picking up the new role assignments.
+    if let Err(e) = framework::auth::session::bump_user_token_version(
+        &state.redis,
+        &state.config.redis_keys,
+        &dto.user_id,
+    )
+    .await
+    {
+        tracing::warn!(error = %e, user_id = %dto.user_id, "token version bump failed after role change");
+    }
 
     Ok(())
 }

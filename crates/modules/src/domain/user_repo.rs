@@ -46,6 +46,9 @@ pub struct UserInsertParams {
     pub user_name: String,
     pub nick_name: String,
     pub password_hash: String,
+    /// 用户归属平台。创建租户管理员时应为父平台的 tenant_id，
+    /// 后台创建普通用户时从 RequestContext.platform_id 读取。
+    pub platform_id: String,
     pub dept_id: Option<String>,
     pub email: String,
     pub phonenumber: String,
@@ -357,7 +360,7 @@ impl UserRepo {
               JOIN sys_role_menu rm ON rm.menu_id = m.menu_id
               JOIN sys_user_role ur ON ur.role_id = rm.role_id
               JOIN sys_role r       ON r.role_id = ur.role_id
-              LEFT JOIN sys_tenant t ON t.tenant_id = $2
+              JOIN sys_tenant t ON t.tenant_id = $2
                 AND t.del_flag = '0'
               LEFT JOIN sys_tenant_package p ON t.package_id = p.package_id
                 AND p.del_flag = '0' AND p.status = '0'
@@ -391,7 +394,7 @@ impl UserRepo {
         let sql = r#"
             SELECT DISTINCT m.perms
               FROM sys_menu m
-              LEFT JOIN sys_tenant t ON t.tenant_id = $1
+              JOIN sys_tenant t ON t.tenant_id = $1
                 AND t.del_flag = '0'
               LEFT JOIN sys_tenant_package p ON t.package_id = p.package_id
                 AND p.del_flag = '0' AND p.status = '0'
@@ -427,23 +430,21 @@ impl UserRepo {
         // from USER_COLUMNS for this single use.
         let plain_columns = USER_COLUMNS.replace("u.", "");
 
-        // platform_id + user_type inlined from domain constants (Phase 1
-        // single-platform assumption). When multi-platform lands in Phase 2
-        // these become bind parameters pulled from RequestContext.
         let sql = format!(
             "INSERT INTO sys_user (\
                 user_id, platform_id, dept_id, user_name, nick_name, user_type, \
                 email, phonenumber, whatsapp, sex, avatar, password, status, del_flag, \
                 login_ip, create_by, update_by, update_at, remark\
             ) VALUES (\
-                $1, '{PLATFORM_ID_DEFAULT}', $2, $3, $4, '{USER_TYPE_CUSTOM}', \
-                $5, $6, '', $7, $8, $9, $10, '0', \
-                '', $11, $12, CURRENT_TIMESTAMP, $13\
+                $1, $2, $3, $4, $5, '{USER_TYPE_CUSTOM}', \
+                $6, $7, '', $8, $9, $10, $11, '0', \
+                '', $12, $13, CURRENT_TIMESTAMP, $14\
             ) RETURNING {plain_columns}"
         );
 
         let user = sqlx::query_as::<_, SysUser>(&sql)
             .bind(&user_id)
+            .bind(&params.platform_id)
             .bind(params.dept_id.as_deref())
             .bind(&params.user_name)
             .bind(&params.nick_name)
