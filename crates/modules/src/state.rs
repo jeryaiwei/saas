@@ -9,6 +9,12 @@ use framework::infra::redis::RedisPool;
 use framework::telemetry::metrics::PrometheusHandle;
 use sqlx::PgPool;
 use std::sync::Arc;
+use tokio::sync::Semaphore;
+
+/// Max concurrent background mail send tasks.
+const MAIL_SEND_PERMITS: usize = 10;
+/// Max concurrent background SMS send tasks.
+const SMS_SEND_PERMITS: usize = 20;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -16,4 +22,18 @@ pub struct AppState {
     pub pg: PgPool,
     pub redis: RedisPool,
     pub metrics: PrometheusHandle,
+    /// Semaphore for mail send backpressure.
+    pub mail_semaphore: Arc<Semaphore>,
+    /// Semaphore for SMS send backpressure.
+    pub sms_semaphore: Arc<Semaphore>,
+}
+
+impl AppState {
+    /// Create default semaphores for mail/SMS send.
+    pub fn new_semaphores() -> (Arc<Semaphore>, Arc<Semaphore>) {
+        (
+            Arc::new(Semaphore::new(MAIL_SEND_PERMITS)),
+            Arc::new(Semaphore::new(SMS_SEND_PERMITS)),
+        )
+    }
 }

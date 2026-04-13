@@ -96,6 +96,15 @@ impl ResponseCode {
     pub const SMS_TEMPLATE_NOT_FOUND: Self = Self(7160);
     pub const SMS_TEMPLATE_CODE_EXISTS: Self = Self(7161);
 
+    // --- 7170-7189 mail/sms send ---
+    pub const MAIL_TEMPLATE_PARAMS_MISSING: Self = Self(7170);
+    pub const MAIL_SEND_FAIL: Self = Self(7171);
+    pub const SMS_CHANNEL_NOT_SUPPORTED: Self = Self(7180);
+    pub const SMS_TEMPLATE_PARAMS_MISSING: Self = Self(7181);
+    pub const BATCH_SIZE_EXCEEDED: Self = Self(7190);
+    pub const SEND_LOG_NOT_FOUND: Self = Self(7191);
+    pub const SEND_LOG_NOT_FAILED: Self = Self(7192);
+
     // --- 3030-3039 user profile ---
     pub const OLD_PASSWORD_INCORRECT: Self = Self(3030);
 

@@ -43,9 +43,11 @@ fn api_openapi_router() -> OpenApiRouter<AppState> {
         .merge(message::mail_account::router())
         .merge(message::mail_template::router())
         .merge(message::mail_log::router())
+        .merge(message::mail_send::router())
         .merge(message::sms_channel::router())
         .merge(message::sms_template::router())
         .merge(message::sms_log::router())
+        .merge(message::sms_send::router())
         // monitor
         .merge(monitor::oper_log::router())
         .merge(monitor::login_log::router())

@@ -35,3 +35,4 @@ chrono.workspace = true
 async-trait.workspace = true
 rand.workspace = true
 utoipa.workspace = true
+lettre.workspace = true

@@ -7,6 +7,9 @@ use anyhow::Context;
 use framework::context::current_tenant_scope;
 use framework::response::{with_timeout, PageQuery, PaginationParams, SLOW_QUERY_WARN_MS};
 
+/// `(total_count, today_count, action_counts)`.
+pub type AuditStatsSummary = (i64, i64, Vec<(String, i64)>);
+
 const AUDIT_LOG_COLUMNS: &str = "\
     id, tenant_id, user_id, user_name, action, module, \
     target_type, target_id, old_value, new_value, ip, \
@@ -128,10 +131,11 @@ impl AuditLogRepo {
     }
 
     /// Stats summary using an acquirable connection for multiple queries.
+    /// Returns `(total_count, today_count, action_counts)`.
     #[tracing::instrument(skip_all)]
     pub async fn stats_summary_full(
         conn: impl sqlx::Acquire<'_, Database = sqlx::Postgres>,
-    ) -> anyhow::Result<(i64, i64, Vec<(String, i64)>)> {
+    ) -> anyhow::Result<AuditStatsSummary> {
         let mut conn = conn.acquire().await.context("audit_log.stats: acquire")?;
         let tenant = current_tenant_scope().context("audit_log.stats: tenant_id required")?;
 

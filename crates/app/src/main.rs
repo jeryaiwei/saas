@@ -66,11 +66,14 @@ async fn main() -> anyhow::Result<()> {
     let redis_pool = redis::build(&cfg.db.redis)?;
 
     // 5. Compose shared AppState
+    let (mail_sem, sms_sem) = AppState::new_semaphores();
     let state = AppState {
         config: cfg.clone(),
         pg: pg_pool,
         redis: redis_pool.clone(),
         metrics: metrics_handle,
+        mail_semaphore: mail_sem,
+        sms_semaphore: sms_sem,
     };
 
     // 6. Middleware sub-states

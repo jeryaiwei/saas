@@ -62,6 +62,25 @@ pub struct MailTemplateUpdateParams {
 pub struct MailTemplateRepo;
 
 impl MailTemplateRepo {
+    /// Find an enabled template by its unique code. Used by mail-send service.
+    #[instrument(skip_all, fields(code = %code))]
+    pub async fn find_enabled_by_code(
+        executor: impl sqlx::PgExecutor<'_>,
+        code: &str,
+    ) -> anyhow::Result<Option<SysMailTemplate>> {
+        let sql = format!(
+            "SELECT {COLUMNS} FROM sys_mail_template \
+             WHERE code = $1 AND status = '0' AND del_flag = '0' \
+             LIMIT 1"
+        );
+        let row = sqlx::query_as::<_, SysMailTemplate>(&sql)
+            .bind(code)
+            .fetch_optional(executor)
+            .await
+            .context("mail_template.find_enabled_by_code")?;
+        Ok(row)
+    }
+
     #[instrument(skip_all, fields(id = %id))]
     pub async fn find_by_id(
         executor: impl sqlx::PgExecutor<'_>,

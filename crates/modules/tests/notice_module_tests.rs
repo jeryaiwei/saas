@@ -106,7 +106,7 @@ async fn update_notice() {
             .expect("find");
         assert!(found.notice_title.contains("updated"));
 
-        common::cleanup_test_notices(&state.pg, PREFIX).await;
+        common::cleanup_test_notices(&state.pg, &format!("{PREFIX}{suffix}")).await;
     })
     .await;
 }

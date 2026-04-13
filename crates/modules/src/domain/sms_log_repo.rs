@@ -3,7 +3,7 @@
 //! DAO conventions:
 //! 1. Each method is one SQL statement.
 //! 2. No cross-repo calls — only service.rs orchestrates.
-//! 3. READ-ONLY — no insert/update/delete.
+//! 3. Has insert/update_status for the SMS send service.
 //! 4. NOT tenant-scoped — no current_tenant_scope.
 
 use super::entities::SysSmsLog;
@@ -20,6 +20,17 @@ const LOG_PAGE_WHERE: &str = "\
     WHERE ($1::varchar IS NULL OR mobile LIKE '%' || $1 || '%') \
       AND ($2::varchar IS NULL OR template_code = $2) \
       AND ($3::int IS NULL OR send_status = $3)";
+
+#[derive(Debug)]
+pub struct SmsLogInsertParams {
+    pub channel_id: i32,
+    pub channel_code: String,
+    pub template_id: i32,
+    pub template_code: String,
+    pub mobile: String,
+    pub content: String,
+    pub params: Option<String>,
+}
 
 #[derive(Debug)]
 pub struct SmsLogListFilter {
@@ -108,5 +119,57 @@ impl SmsLogRepo {
 
         let total = PaginationParams::reconcile_total(observed_total, rows.len(), p.offset);
         Ok(p.into_page(rows, total))
+    }
+
+    #[instrument(skip_all, fields(mobile = %params.mobile, template_code = %params.template_code))]
+    pub async fn insert(
+        executor: impl sqlx::PgExecutor<'_>,
+        params: SmsLogInsertParams,
+    ) -> anyhow::Result<SysSmsLog> {
+        let sql = format!(
+            "INSERT INTO sys_sms_log (\
+                channel_id, channel_code, template_id, template_code, \
+                mobile, content, params, send_status, send_time\
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, CURRENT_TIMESTAMP) \
+            RETURNING {COLUMNS}"
+        );
+        let row = sqlx::query_as::<_, SysSmsLog>(&sql)
+            .bind(params.channel_id)
+            .bind(&params.channel_code)
+            .bind(params.template_id)
+            .bind(&params.template_code)
+            .bind(&params.mobile)
+            .bind(&params.content)
+            .bind(params.params.as_deref())
+            .fetch_one(executor)
+            .await
+            .context("sms_log.insert")?;
+        Ok(row)
+    }
+
+    #[instrument(skip_all, fields(id = %id, send_status = %send_status))]
+    pub async fn update_status(
+        executor: impl sqlx::PgExecutor<'_>,
+        id: i64,
+        send_status: i32,
+        api_send_code: Option<&str>,
+        error_msg: Option<&str>,
+    ) -> anyhow::Result<u64> {
+        let sql = "\
+            UPDATE sys_sms_log \
+            SET send_status = $2, \
+                api_send_code = $3, \
+                error_msg = $4 \
+            WHERE id = $1";
+        let affected = sqlx::query(sql)
+            .bind(id)
+            .bind(send_status)
+            .bind(api_send_code)
+            .bind(error_msg)
+            .execute(executor)
+            .await
+            .context("sms_log.update_status")?
+            .rows_affected();
+        Ok(affected)
     }
 }

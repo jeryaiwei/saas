@@ -52,11 +52,14 @@ pub async fn build_state_and_router() -> (AppState, Router) {
     let pg_pool = pg::connect_lazy(&cfg.db.postgresql).expect("pg pool");
     let redis_pool = redis::build(&cfg.db.redis).expect("redis pool");
 
+    let (mail_sem, sms_sem) = AppState::new_semaphores();
     let state = AppState {
         config: cfg,
         pg: pg_pool,
         redis: redis_pool,
         metrics: metrics_handle,
+        mail_semaphore: mail_sem,
+        sms_semaphore: sms_sem,
     };
     let router = router(state.clone());
     (state, router)

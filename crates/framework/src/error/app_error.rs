@@ -25,6 +25,12 @@ pub enum AppError {
     #[error("business error [{code}]")]
     Business { code: ResponseCode },
 
+    #[error("business error [{code}]: {msg}")]
+    BusinessWithMsg {
+        code: ResponseCode,
+        msg: String,
+    },
+
     #[error("authentication error [{code}]")]
     Auth { code: ResponseCode },
 
@@ -59,6 +65,13 @@ impl AppError {
         Self::Business { code }
     }
 
+    pub fn business_with_msg(code: ResponseCode, msg: impl Into<String>) -> Self {
+        Self::BusinessWithMsg {
+            code,
+            msg: msg.into(),
+        }
+    }
+
     pub fn auth(code: ResponseCode) -> Self {
         Self::Auth { code }
     }
@@ -70,6 +83,7 @@ impl AppError {
     fn status_code(&self) -> StatusCode {
         match self {
             AppError::Business { .. } => StatusCode::OK,
+            AppError::BusinessWithMsg { .. } => StatusCode::OK,
             AppError::Auth { .. } => StatusCode::UNAUTHORIZED,
             AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
             AppError::Validation { .. } => StatusCode::BAD_REQUEST,
@@ -87,6 +101,7 @@ impl IntoResponse for AppError {
 
         let (code, msg, data): (ResponseCode, String, Value) = match self {
             AppError::Business { code } => (code, i18n::get_message(code, &lang), Value::Null),
+            AppError::BusinessWithMsg { code, msg } => (code, msg, Value::Null),
             AppError::Auth { code } => (code, i18n::get_message(code, &lang), Value::Null),
             AppError::Forbidden { code } => (code, i18n::get_message(code, &lang), Value::Null),
             AppError::Validation { errors } => {
@@ -171,6 +186,10 @@ mod tests {
                 StatusCode::OK,
             ),
             (
+                AppError::business_with_msg(ResponseCode::DATA_NOT_FOUND, "custom msg"),
+                StatusCode::OK,
+            ),
+            (
                 AppError::auth(ResponseCode::TOKEN_INVALID),
                 StatusCode::UNAUTHORIZED,
             ),
@@ -203,6 +222,7 @@ mod tests {
         fn exhaustive_check(e: &AppError) -> StatusCode {
             match e {
                 AppError::Business { .. } => StatusCode::OK,
+                AppError::BusinessWithMsg { .. } => StatusCode::OK,
                 AppError::Auth { .. } => StatusCode::UNAUTHORIZED,
                 AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
                 AppError::Validation { .. } => StatusCode::BAD_REQUEST,

@@ -53,7 +53,7 @@ pub use login_log_repo::{LoginLogListFilter, LoginLogRepo};
 pub use mail_account_repo::{
     MailAccountInsertParams, MailAccountListFilter, MailAccountRepo, MailAccountUpdateParams,
 };
-pub use mail_log_repo::{MailLogListFilter, MailLogRepo};
+pub use mail_log_repo::{MailLogInsertParams, MailLogListFilter, MailLogRepo};
 pub use mail_template_repo::{
     MailTemplateInsertParams, MailTemplateListFilter, MailTemplateRepo, MailTemplateUpdateParams,
 };
@@ -76,7 +76,7 @@ pub use role_repo::{
 pub use sms_channel_repo::{
     SmsChannelInsertParams, SmsChannelListFilter, SmsChannelRepo, SmsChannelUpdateParams,
 };
-pub use sms_log_repo::{SmsLogListFilter, SmsLogRepo};
+pub use sms_log_repo::{SmsLogInsertParams, SmsLogListFilter, SmsLogRepo};
 pub use sms_template_repo::{
     SmsTemplateInsertParams, SmsTemplateListFilter, SmsTemplateRepo, SmsTemplateUpdateParams,
 };

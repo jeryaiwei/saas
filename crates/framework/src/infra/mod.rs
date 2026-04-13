@@ -10,3 +10,4 @@ pub mod captcha;
 pub mod crypto;
 pub mod pg;
 pub mod redis;
+pub mod smtp;
