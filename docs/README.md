@@ -7,11 +7,11 @@
 | 端点数 | 133 (system 65 + message 48 + monitor 7 + auth 4 + health 9) |
 | 模块数 | 22 (system 9 + message 9 + monitor 2 + auth 1 + health 1) |
 | 测试数 | 304 |
-| Smoke | role 14 + user 16 + tenant 13 + menu 10 + dept 8 = 61 steps |
+| Smoke | 12 scripts, 119 steps (role 14 + user 16 + tenant 13 + menu 10 + dept 8 + post 8 + config 9 + dict 11 + notice 7 + notify 12 + operlog 6 + loginlog 5) |
 | 框架规范 | 7 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog) |
 | 业务设计 | 5 份 (role / user / tenant / menu / dept) |
 | Swagger | /swagger-ui (Bearer JWT, 中文 tag/summary) |
-| Operlog | 43 写路由自动记录操作日志 |
+| Operlog | 65 写路由自动记录操作日志 |
 
 ---
 
@@ -29,7 +29,7 @@
 | [observability-spec](framework/framework-observability-spec.md) | v1.0 已落地 | root span 自动注入 request_id/tenant_id/user_id, middleware instrument, login event, span 字段命名, metric 命名约定 |
 | [repo-executor-spec](framework/framework-repo-executor-spec.md) | v1.0 | impl PgExecutor vs &PgPool vs &mut Transaction 选择规则, service 层事务边界, 禁止模式 |
 | [openapi-spec](framework/framework-openapi-spec.md) | v1.0 | utoipa + OpenApiRouter 架构, DTO derive 规范, handler 注解, router 注册, 权限模式, 中文 tag |
-| [operlog-spec](framework/framework-operlog-spec.md) | v1.0 | 操作日志两层设计 (OperlogMarkLayer + global_operlog), BusinessType, 43 写路由覆盖 |
+| [operlog-spec](framework/framework-operlog-spec.md) | v1.1 | 操作日志路由级设计 (OperlogLayer + Extension&lt;PgPool&gt;), BusinessType, 65 写路由覆盖 |
 
 ### 业务模块设计 (`docs/specs/`)
 
@@ -179,12 +179,22 @@ cargo test --workspace                 # 304 tests
 cargo clippy --all-targets
 cargo fmt --check
 
-# Smoke (需要 app 在跑 + DB 在跑)
+# Smoke (需要 app 在跑 + DB 在跑, 共 12 脚本 119 steps)
+for s in scripts/smoke-*.sh; do bash "$s"; done
+
+# 或单独运行
 bash scripts/smoke-role-module.sh      # 14 steps
 bash scripts/smoke-user-module.sh      # 16 steps
 bash scripts/smoke-tenant-module.sh    # 13 steps
 bash scripts/smoke-menu-module.sh      # 10 steps
 bash scripts/smoke-dept-module.sh      #  8 steps
+bash scripts/smoke-post-module.sh      #  8 steps
+bash scripts/smoke-config-module.sh    #  9 steps
+bash scripts/smoke-dict-module.sh      # 11 steps
+bash scripts/smoke-notice-module.sh    #  7 steps
+bash scripts/smoke-notify-module.sh    # 12 steps
+bash scripts/smoke-operlog-module.sh   #  6 steps
+bash scripts/smoke-loginlog-module.sh  #  5 steps
 
 # Git
 git remote -v                          # github: jeryaiwei/saas.git

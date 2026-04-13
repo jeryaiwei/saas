@@ -1,26 +1,27 @@
-# 操作日志 (Operlog) 框架规范 v1.0
+# 操作日志 (Operlog) 框架规范 v1.1
 
-**生效日期**：2026-04-12
+**生效日期**：2026-04-13
 **状态**：Normative（规范性）
 
 ---
 
 ## 1. 架构
 
-两层设计，职责分离：
+路由级完整中间件设计（方案 C）：
 
 ```text
+main.rs
+  └── .layer(Extension(pool))       ← PgPool 注入到每个请求的 extensions
+
 handler.rs (路由级)
   └── operlog!("模块名", Insert)
-        → OperlogMarkLayer 往 request extension 塞 OperlogMark
-
-main.rs (全局级)
-  └── global_operlog middleware
-        → 读 OperlogMark → 缓冲 request/response body
-        → 异步写 sys_oper_log (scope_spawn, 不阻塞响应)
+        → OperlogLayer / OperlogService
+        → 从 req.extensions() 读取 PgPool
+        → 缓冲 request/response body
+        → scope_spawn 异步写 sys_oper_log
 ```
 
-**无 mark 的路由零开销** — 全局 middleware 检查 extension 后直接 `next.run(req)`。
+**无 operlog 的路由零开销** — OperlogLayer 只挂在写路由上，读路由不受影响。
 
 ---
 
@@ -44,24 +45,22 @@ pub fn router() -> OpenApiRouter<AppState> {
 }
 ```
 
-### 2.2 main.rs — 全局 layer
+### 2.2 main.rs — 注入 PgPool
 
 ```rust
-use framework::middleware::operlog;
+use axum::Extension;
 
 let operlog_pool = state.pg.clone();
 let app = Router::new()
     // ... routes ...
     .with_state(state)
     .layer(from_fn_with_state(tenant_state, tenant_mw::tenant_guard))
-    .layer(from_fn(move |req, next| {
-        operlog::global_operlog(operlog_pool.clone(), req, next)
-    }))
+    .layer(Extension(operlog_pool))   // PgPool for operlog route-level middleware
     .layer(from_fn_with_state(auth_state, auth_mw::auth))
     // ...
 ```
 
-**层序**：operlog 在 tenant_guard 之后、auth 之前。这样 operlog 能读到 `RequestContext` 中的 `user_name` / `tenant_id`（由 auth 设置）。
+`Extension<PgPool>` 注入到请求的 extensions 中，`OperlogService` 在路由级读取。
 
 ---
 
@@ -112,19 +111,20 @@ let app = Router::new()
 - 所有 **读操作**（GET list/query/select）
 - `oper_log` 模块自身（避免递归记录）
 - `auth/login`、`auth/logout`（登录日志由专门的 `sys_logininfor` 记录）
+- 只读模块（`mail_log`、`sms_log`）
 
 ### 5.3 layer 链式写法
 
 写路由需要同时挂 permission + operlog 两个 layer。由于 `UtoipaMethodRouter::layer()` 的类型推断问题，**必须** 使用 `.map()` + turbofish 模式：
 
 ```rust
-// ✅ 正确
+// 正确
 .routes(routes!(create).map(|r| {
     r.layer::<_, Infallible>(require_permission!("xxx"))
         .layer(operlog!("模块", Insert))
 }))
 
-// ❌ 错误 — 编译失败（E0283 类型推断歧义）
+// 错误 — 编译失败（E0283 类型推断歧义）
 .routes(routes!(create)
     .layer(require_permission!("xxx"))
     .layer(operlog!("模块", Insert)))
@@ -136,6 +136,7 @@ let app = Router::new()
 - **不阻塞** HTTP 响应
 - 写入失败只记 `tracing::warn`，**不影响** 业务结果
 - `scope_spawn` 继承 `RequestContext`（tenant_id / user_name 可用）
+- PgPool 缺失时记 `tracing::warn`，日志跳过（不 panic）
 
 ---
 
@@ -146,17 +147,25 @@ let app = Router::new()
 | 配置管理 | 4 | — |
 | 部门管理 | 3 | — |
 | 字典管理 | 6 | — |
-| 登录日志 | 2 | — |
 | 菜单管理 | 4 | — |
-| 通知公告 | 3 | — |
 | 岗位管理 | 3 | — |
 | 角色管理 | 6 | — |
 | 租户管理 | 3 | — |
 | 套餐管理 | 3 | — |
 | 用户管理 | 6 | — |
+| 通知公告 | 3 | — |
+| 站内信模板 | 3 | — |
+| 站内信消息 | 7 | — |
+| 邮箱账号 | 3 | — |
+| 邮件模板 | 3 | — |
+| 短信渠道 | 3 | — |
+| 短信模板 | 3 | — |
+| 登录日志 | 2 | — |
 | 操作日志 | 0 | 避免递归 |
 | 认证 | 0 | 登录日志独立记录 |
-| **合计** | **43** | |
+| 邮件日志 | 0 | 只读 |
+| 短信日志 | 0 | 只读 |
+| **合计** | **65** | |
 
 ---
 
@@ -164,7 +173,16 @@ let app = Router::new()
 
 | 文件 | 职责 |
 | --- | --- |
-| `framework/src/middleware/operlog.rs` | OperlogMark + OperlogMarkLayer + global_operlog + BusinessType |
-| `framework/src/middleware/macros.rs` | `operlog!` 宏定义（与 require_permission! 等统一管理） |
-| `app/src/main.rs` | 全局 layer 注册 |
-| 各 `handler.rs` router() | 路由级 operlog! 标记 |
+| `framework/src/middleware/operlog.rs` | OperlogLayer + OperlogService + BusinessType |
+| `framework/src/middleware/macros.rs` | `operlog!` 宏（与 require_permission! 等统一管理） |
+| `app/src/main.rs` | `Extension(pool)` 注入 |
+| 各 `handler.rs` router() | 路由级 `operlog!` 标记 |
+
+---
+
+## 8. 架构演进记录
+
+| 版本 | 方案 | 问题 |
+| --- | --- | --- |
+| v1.0 | OperlogMarkLayer (route) + global_operlog (global) | route extension 对 global layer 不可见 |
+| **v1.1** | **OperlogLayer (route-level 完整) + Extension&lt;PgPool&gt;** | **已解决** |
