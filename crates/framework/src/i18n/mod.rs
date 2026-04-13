@@ -245,11 +245,54 @@ mod tests {
             ResponseCode::TENANT_PACKAGE_CODE_EXISTS,
             ResponseCode::TENANT_PACKAGE_NAME_EXISTS,
             ResponseCode::TENANT_PACKAGE_IN_USE,
+            // 3030-3039 user profile
+            ResponseCode::OLD_PASSWORD_INCORRECT,
+            // 4030-4039 tenant switch
+            ResponseCode::TENANT_BINDING_NOT_FOUND,
+            // 5000-5039 file
+            ResponseCode::FOLDER_NOT_FOUND,
+            ResponseCode::FOLDER_HAS_SUBFOLDERS,
+            ResponseCode::FILE_NOT_FOUND,
+            ResponseCode::SHARE_NOT_FOUND,
             // 7000-7099 system module
             ResponseCode::DEPT_NOT_FOUND,
             ResponseCode::DEPT_PARENT_NOT_FOUND,
             ResponseCode::DEPT_NESTING_TOO_DEEP,
             ResponseCode::MENU_NOT_FOUND,
+            ResponseCode::DICT_TYPE_NOT_FOUND,
+            ResponseCode::DICT_TYPE_EXISTS,
+            ResponseCode::DICT_DATA_NOT_FOUND,
+            ResponseCode::DICT_DATA_EXISTS,
+            ResponseCode::CONFIG_NOT_FOUND,
+            ResponseCode::CONFIG_KEY_EXISTS,
+            ResponseCode::POST_NOT_FOUND,
+            ResponseCode::POST_CODE_EXISTS,
+            ResponseCode::POST_NAME_EXISTS,
+            ResponseCode::NOTICE_NOT_FOUND,
+            // 7100-7199 message module
+            ResponseCode::NOTIFY_TEMPLATE_NOT_FOUND,
+            ResponseCode::NOTIFY_TEMPLATE_CODE_EXISTS,
+            ResponseCode::NOTIFY_MESSAGE_NOT_FOUND,
+            ResponseCode::MAIL_ACCOUNT_NOT_FOUND,
+            ResponseCode::MAIL_ACCOUNT_EXISTS,
+            ResponseCode::MAIL_TEMPLATE_NOT_FOUND,
+            ResponseCode::MAIL_TEMPLATE_CODE_EXISTS,
+            ResponseCode::SMS_CHANNEL_NOT_FOUND,
+            ResponseCode::SMS_CHANNEL_CODE_EXISTS,
+            ResponseCode::SMS_TEMPLATE_NOT_FOUND,
+            ResponseCode::SMS_TEMPLATE_CODE_EXISTS,
+            // 7170-7192 mail/sms send
+            ResponseCode::MAIL_TEMPLATE_PARAMS_MISSING,
+            ResponseCode::MAIL_SEND_FAIL,
+            ResponseCode::SMS_CHANNEL_NOT_SUPPORTED,
+            ResponseCode::SMS_TEMPLATE_PARAMS_MISSING,
+            ResponseCode::BATCH_SIZE_EXCEEDED,
+            ResponseCode::SEND_LOG_NOT_FOUND,
+            ResponseCode::SEND_LOG_NOT_FAILED,
+            // 7200-7299 monitor module
+            ResponseCode::OPER_LOG_NOT_FOUND,
+            ResponseCode::LOGIN_LOG_NOT_FOUND,
+            ResponseCode::AUDIT_LOG_NOT_FOUND,
         ];
 
         for code in codes {

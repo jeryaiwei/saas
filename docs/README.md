@@ -2,16 +2,16 @@
 
 ## 项目状态
 
-| 指标 | 值 |
-| --- | --- |
-| 端点数 | 133 (system 65 + message 48 + monitor 7 + auth 4 + health 9) |
-| 模块数 | 22 (system 9 + message 9 + monitor 2 + auth 1 + health 1) |
-| 测试数 | 304 |
-| Smoke | 12 scripts, 119 steps (role 14 + user 16 + tenant 13 + menu 10 + dept 8 + post 8 + config 9 + dict 11 + notice 7 + notify 12 + operlog 6 + loginlog 5) |
-| 框架规范 | 8 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog / tenant) |
-| 业务设计 | 5 份 (role / user / tenant / menu / dept) |
-| Swagger | /swagger-ui (Bearer JWT, 中文 tag/summary) |
-| Operlog | 65 写路由自动记录操作日志 |
+| 指标     | 值                                                                                                                                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 端点数   | 188 (system 84 + message 55 + monitor 13 + auth 6 + health 9)                                                                                          |
+| 模块数   | 30 (system 12 + message 11 + monitor 5 + auth 1 + health 1)                                                                                            |
+| 测试数   | 326                                                                                                                                                    |
+| Smoke    | 12 scripts, 119 steps (role 14 + user 16 + tenant 13 + menu 10 + dept 8 + post 8 + config 9 + dict 11 + notice 7 + notify 12 + operlog 6 + loginlog 5) |
+| 框架规范 | 8 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog / tenant)                                   |
+| 业务设计 | 6 份 (role / user / tenant / menu / dept / mail-sms-send)                                                                                              |
+| Swagger  | /swagger-ui (Bearer JWT, 中文 tag/summary)                                                                                                             |
+| Operlog  | 72 写路由自动记录操作日志                                                                                                                              |
 
 ---
 
@@ -21,48 +21,23 @@
 
 定义了所有模块必须遵守的跨切面契约。新增业务模块前应读完这些规范。
 
-| 文档 | 版本 | 内容 |
-| --- | --- | --- |
-| [pagination-spec](framework/framework-pagination-spec.md) | v1.0 + v1.1 | 分页类型 (PageQuery / PaginationParams / Page), filter struct 规范, into_page, with_timeout, reconcile_total, slow-query warn |
-| [pagination-indexes](framework/framework-pagination-indexes.md) | v1.0 | 每个 find_page 的索引依赖表 |
-| [error-envelope-spec](framework/framework-error-envelope-spec.md) | v1.0 | 统一 wire envelope (ApiResponse), AppError 5 variant, ResponseCode 段位, i18n 命名空间, FieldError 路径格式 |
-| [observability-spec](framework/framework-observability-spec.md) | v1.0 已落地 | root span 自动注入 request_id/tenant_id/user_id, middleware instrument, login event, span 字段命名, metric 命名约定 |
-| [repo-executor-spec](framework/framework-repo-executor-spec.md) | v1.0 | impl PgExecutor vs &PgPool vs &mut Transaction 选择规则, service 层事务边界, 禁止模式 |
-| [openapi-spec](framework/framework-openapi-spec.md) | v1.0 | utoipa + OpenApiRouter 架构, DTO derive 规范, handler 注解, router 注册, 权限模式, 中文 tag |
-| [operlog-spec](framework/framework-operlog-spec.md) | v1.1 | 操作日志路由级设计 (OperlogLayer + Extension&lt;PgPool&gt;), BusinessType, 65 写路由覆盖 |
-| [tenant-spec](framework/framework-tenant-spec.md) | v1.0 | 三层租户架构, 套餐绑定, 管理员层级, 权限计算, 租户切换, Session 结构, 数据过滤模型 |
-
-### 业务模块设计 (`docs/specs/`)
-
-每个模块的端点列表, DTO 字段, 数据层方法, 错误码, 测试策略。
-
-| 文档 | 模块 | 端点 | 状态 |
-| --- | --- | --- | --- |
-| [role-module-design](specs/2026-04-10-phase1-role-module-design.md) | Role | 11 | 已实现 |
-| [user-module-design](specs/2026-04-11-phase1-user-module-design.md) | User | 11 | 已实现 |
-| [tenant-module-design](specs/2026-04-12-tenant-module-design.md) | Tenant + Package | 12 | 已实现 |
-| [menu-module-design](specs/2026-04-12-menu-module-design.md) | Menu | 9 | 已实现 |
-| [dept-module-design](specs/2026-04-12-dept-module-design.md) | Dept | 7 | 已实现 |
-
-### 实施计划 (`docs/plans/`)
-
-| 文档 | 状态 |
-| --- | --- |
-| role-module-plan | 已执行 |
-| user-module-plan | 已执行 |
-| tenant-module-plan | 已执行 |
-| menu-module-plan | 已执行 |
-| dept-module-plan | 已执行 |
-| framework-pagination-v1.1 | 已执行 |
-| framework-error-envelope-v1.0 | 已执行 |
-| framework-observability-v1.0 | 已执行 |
+| 文档                                                              | 版本        | 内容                                                                                                                          |
+| ----------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| [pagination-spec](framework/framework-pagination-spec.md)         | v1.0 + v1.1 | 分页类型 (PageQuery / PaginationParams / Page), filter struct 规范, into_page, with_timeout, reconcile_total, slow-query warn |
+| [pagination-indexes](framework/framework-pagination-indexes.md)   | v1.0        | 每个 find_page 的索引依赖表                                                                                                   |
+| [error-envelope-spec](framework/framework-error-envelope-spec.md) | v1.0        | 统一 wire envelope (ApiResponse), AppError 5 variant, ResponseCode 段位, i18n 命名空间, FieldError 路径格式                   |
+| [observability-spec](framework/framework-observability-spec.md)   | v1.0 已落地 | root span 自动注入 request_id/tenant_id/user_id, middleware instrument, login event, span 字段命名, metric 命名约定           |
+| [repo-executor-spec](framework/framework-repo-executor-spec.md)   | v1.0        | impl PgExecutor vs &PgPool vs &mut Transaction 选择规则, service 层事务边界, 禁止模式                                         |
+| [openapi-spec](framework/framework-openapi-spec.md)               | v1.0        | utoipa + OpenApiRouter 架构, DTO derive 规范, handler 注解, router 注册, 权限模式, 中文 tag                                   |
+| [operlog-spec](framework/framework-operlog-spec.md)               | v1.1        | 操作日志路由级设计 (OperlogLayer + Extension&lt;PgPool&gt;), BusinessType, 65 写路由覆盖                                      |
+| [tenant-spec](framework/framework-tenant-spec.md)                 | v1.0        | 三层租户架构, 套餐绑定, 管理员层级, 权限计算, 租户切换, Session 结构, 数据过滤模型                                            |
 
 ### 其他
 
-| 文档 | 内容 |
-| --- | --- |
-| [phase0-schema-reference.sql](phase0-schema-reference.sql) | 13 张表的 DDL + 68 个索引 (从线上 pg_indexes 导出) |
-| [archive/](archive/) | 历史 RESUME handoff 文档 |
+| 文档                                         | 内容                                   |
+| -------------------------------------------- | -------------------------------------- |
+| [schema-reference.sql](schema-reference.sql) | 29 张表的 DDL (从线上 pg_indexes 导出) |
+| [archive/](archive/)                         | 历史 RESUME handoff 文档               |
 
 ---
 
@@ -75,10 +50,12 @@ server-rs/
 │   │                  i18n, infra, middleware, response, telemetry, testing)
 │   ├── modules/       业务模块
 │   │                  system/ (config,dept,dict,menu,post,role,tenant,tenant_package,user)
+│   │                  system/ + (audit_log, file_manager, tenant_dashboard)
 │   │                  message/ (notice,notify_template,notify_message,mail_account,
-│   │                           mail_template,mail_log,sms_channel,sms_template,sms_log)
-│   │                  monitor/ (oper_log,login_log)
-│   │                  + auth/ + health/ + domain/ (22 repos) + openapi.rs
+│   │                           mail_template,mail_log,mail_send,sms_channel,
+│   │                           sms_template,sms_log,sms_send)
+│   │                  monitor/ (oper_log,login_log,online_user,server_info,cache)
+│   │                  + auth/ + health/ + domain/ (28 repos) + openapi.rs
 │   └── app/           二进制入口 (main.rs, middleware 组装, swagger-ui, CORS)
 ├── config/            YAML 配置 (default + development)
 ├── i18n/              国际化 (zh-CN.json + en-US.json)
@@ -129,20 +106,20 @@ split_for_parts() → (Router, OpenApi)
 
 ### 权限声明 4 种模式
 
-| 模式 | 宏 | 场景 | 数量 |
-| --- | --- | --- | --- |
-| RBAC 权限 | `require_permission!("system:xxx:action")` | 标准端点 | 64 |
-| 仅需登录 | `require_authenticated!()` | 下拉选项等 | 18 |
-| 角色限制 | `require_role!(Role::TenantAdmin)` | 敏感操作 | 6 |
-| 组合门控 | `require_access! { permission: "...", role: ... }` | 权限+角色 | 4 |
+| 模式      | 宏                                                 | 场景       | 数量 |
+| --------- | -------------------------------------------------- | ---------- | ---- |
+| RBAC 权限 | `require_permission!("system:xxx:action")`         | 标准端点   | 71   |
+| 仅需登录  | `require_authenticated!()`                         | 下拉选项等 | 18   |
+| 角色限制  | `require_role!(Role::TenantAdmin)`                 | 敏感操作   | 6    |
+| 组合门控  | `require_access! { permission: "...", role: ... }` | 权限+角色  | 4    |
 
 ### 租户过滤模型
 
-| 模型 | helper | 过滤键 | 模块 |
-| --- | --- | --- | --- |
-| STRICT | `current_tenant_scope()` | tenant_id | Role, Dept, Post |
-| PLATFORM | `current_platform_scope()` | platform_id | Config, DictType, DictData |
-| 不过滤 | — | — | Menu, TenantPackage, User(via join) |
+| 模型     | helper                     | 过滤键      | 模块                                |
+| -------- | -------------------------- | ----------- | ----------------------------------- |
+| STRICT   | `current_tenant_scope()`   | tenant_id   | Role, Dept, Post                    |
+| PLATFORM | `current_platform_scope()` | platform_id | Config, DictType, DictData          |
+| 不过滤   | —                          | —           | Menu, TenantPackage, User(via join) |
 
 ---
 
@@ -176,7 +153,7 @@ cargo build -p app
 open http://127.0.0.1:18080/swagger-ui/
 
 # 测试
-cargo test --workspace                 # 304 tests
+cargo test --workspace                 # 326 tests
 cargo clippy --all-targets
 cargo fmt --check
 
@@ -206,19 +183,5 @@ git push github main
 
 ## 下一步
 
-1. **P2: Vue Web 灰度切换** — 133 端点覆盖管理端 CRUD，按模块切 vite proxy
-2. **P3: Audit Log** — 4 端点只读，补齐 monitor
-3. **P4: File Manager** — Phase 1 文件夹+列表, Phase 2 上传/下载
-4. **P5: Mail Send / SMS Send** — 对接外部服务，延后
-
-**触发器表** (不主动做, 等条件满足):
-
-| 项目 | 触发条件 |
-| --- | --- |
-| Pagination v2.0 (total: Option) | 信息泄露审计 / C 端 feed |
-| Error v2.0 (业务错误参数化) | ACCOUNT_LOCKED 实装 |
-| Cursor pagination | 深翻页 p99 > 1s |
-| Sort framework | 产品要求可选排序列 |
-| `#[api]` proc macro | 端点 > 150 或团队 > 2 人 |
-| Tenant switching (scope B) | 后台管理员切换租户 |
-| Enterprise certification (scope C) | C 端用户变企业 |
+1. **Vue Web 灰度切换** — 188 端点覆盖管理端，改 proxy target 即可
+2. **腾讯/华为 SMS 真实接入** — 替换 mock client

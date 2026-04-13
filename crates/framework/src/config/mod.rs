@@ -38,6 +38,8 @@ pub struct AppConfig {
     pub logger: LoggerConfig,
     pub redis_keys: RedisKeyConfig,
     pub redis_ttl: RedisTtlConfig,
+    #[serde(default)]
+    pub mail: MailConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -194,6 +196,33 @@ pub struct RedisTtlConfig {
     pub captcha: u64,
     pub token_blacklist: u64,
     pub user_token_version: u64,
+}
+
+// `Debug` is hand-written below to redact the encryption key.
+#[derive(Clone, Deserialize)]
+pub struct MailConfig {
+    #[serde(default = "default_mail_password_key")]
+    pub mail_password_key: String,
+}
+
+impl Default for MailConfig {
+    fn default() -> Self {
+        Self {
+            mail_password_key: default_mail_password_key(),
+        }
+    }
+}
+
+impl std::fmt::Debug for MailConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MailConfig")
+            .field("mail_password_key", &"***")
+            .finish()
+    }
+}
+
+fn default_mail_password_key() -> String {
+    "mail-password-encryption-key-32b".into()
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -390,6 +419,7 @@ mod tests {
                 token_blacklist: 86400,
                 user_token_version: 604800,
             },
+            mail: MailConfig::default(),
         }
     }
 

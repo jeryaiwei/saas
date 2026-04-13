@@ -12,6 +12,7 @@ use framework::infra::smtp::{self, MailMessage, SmtpParams};
 use framework::response::ResponseCode;
 use sqlx::PgPool;
 use std::collections::HashMap;
+use validator::ValidateEmail;
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ pub async fn send(state: &AppState, dto: SendMailDto) -> Result<SendMailResponse
     .into_internal()?;
 
     // 6. Spawn background send task
-    let smtp_params = build_smtp_params(&account);
+    let smtp_params = build_smtp_params(&account, &state.config.mail.mail_password_key);
     let mail_msg = MailMessage {
         from_name: template.nickname.clone(),
         from_mail: account.mail.clone(),
@@ -76,9 +77,17 @@ pub async fn batch_send(
     state: &AppState,
     dto: BatchSendMailDto,
 ) -> Result<BatchSendMailResponseDto, AppError> {
-    // 1. Validate batch size
+    // 1. Validate batch size + email format
     if dto.to_mails.len() > 100 {
         return Err(AppError::business(ResponseCode::BATCH_SIZE_EXCEEDED));
+    }
+    for mail in &dto.to_mails {
+        if !mail.validate_email() {
+            return Err(AppError::business_with_msg(
+                ResponseCode::PARAM_INVALID,
+                format!("Invalid email address: {mail}"),
+            ));
+        }
     }
 
     // 2. Find template + account
@@ -99,6 +108,9 @@ pub async fn batch_send(
 
     let (user_id, user_type) = current_user_info();
     let count = dto.to_mails.len() as i32;
+
+    // Build SMTP params once (scrypt key derivation is expensive)
+    let smtp_params = build_smtp_params(&account, &state.config.mail.mail_password_key);
 
     // 4. For each recipient: insert log + spawn task
     for to_mail in dto.to_mails {
@@ -121,7 +133,6 @@ pub async fn batch_send(
         .await
         .into_internal()?;
 
-        let smtp_params = build_smtp_params(&account);
         let mail_msg = MailMessage {
             from_name: template.nickname.clone(),
             from_mail: account.mail.clone(),
@@ -129,7 +140,7 @@ pub async fn batch_send(
             subject: rendered_title.clone(),
             html_body: rendered_content.clone(),
         };
-        spawn_send_task(state, log.id, smtp_params, mail_msg);
+        spawn_send_task(state, log.id, smtp_params.clone(), mail_msg);
     }
 
     Ok(BatchSendMailResponseDto { count })
@@ -161,7 +172,7 @@ pub async fn resend(state: &AppState, log_id: i64) -> Result<(), AppError> {
         .into_internal()?;
 
     // 5. Spawn background task using log snapshot fields
-    let smtp_params = build_smtp_params(&account);
+    let smtp_params = build_smtp_params(&account, &state.config.mail.mail_password_key);
     let mail_msg = MailMessage {
         from_name: log.template_nickname,
         from_mail: log.from_mail,
@@ -183,7 +194,7 @@ pub async fn test_send(state: &AppState, dto: TestMailDto) -> Result<(), AppErro
         .or_business(ResponseCode::MAIL_ACCOUNT_NOT_FOUND)?;
 
     // 2. Build SMTP params and message
-    let smtp_params = build_smtp_params(&account);
+    let smtp_params = build_smtp_params(&account, &state.config.mail.mail_password_key);
     let mail_msg = MailMessage {
         from_name: account.username.clone(),
         from_mail: account.mail.clone(),
@@ -236,13 +247,22 @@ fn current_user_info() -> (Option<String>, Option<i32>) {
     .unwrap_or((None, None))
 }
 
-fn build_smtp_params(account: &SysMailAccount) -> SmtpParams {
+fn build_smtp_params(account: &SysMailAccount, mail_password_key: &str) -> SmtpParams {
+    let password = framework::infra::crypto::decrypt_aes256cbc(
+        &account.password,
+        mail_password_key,
+    )
+    .unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "failed to decrypt mail password, using raw");
+        account.password.clone()
+    });
+
     SmtpParams {
         host: account.host.clone(),
         port: account.port as u16,
         ssl_enable: account.ssl_enable,
         username: account.username.clone(),
-        password: account.password.clone(),
+        password,
     }
 }
 
@@ -271,12 +291,16 @@ async fn execute_mail_send(
     .await;
     match result {
         Ok(()) => {
-            MailLogRepo::update_status(pg, log_id, 1, None).await.ok();
+            tracing::info!(log_id, "mail sent successfully");
+            if let Err(e) = MailLogRepo::update_status(pg, log_id, 1, None).await {
+                tracing::error!(log_id, error = %e, "failed to update mail log status to SUCCESS");
+            }
         }
         Err(e) => {
-            MailLogRepo::update_status(pg, log_id, 2, Some(&e))
-                .await
-                .ok();
+            tracing::error!(log_id, error = %e, "mail send failed after retries");
+            if let Err(db_err) = MailLogRepo::update_status(pg, log_id, 2, Some(&e)).await {
+                tracing::error!(log_id, error = %db_err, "failed to update mail log status to FAILED");
+            }
         }
     }
 }
@@ -288,15 +312,18 @@ where
     F: Fn() -> Fut,
     Fut: std::future::Future<Output = Result<(), String>>,
 {
+    let mut last_err = String::from("max retries exhausted");
     for attempt in 0..MAX_RETRIES {
         match f().await {
             Ok(()) => return Ok(()),
-            Err(e) if attempt < MAX_RETRIES - 1 => {
-                tokio::time::sleep(std::time::Duration::from_secs(2u64.pow(attempt + 1))).await;
-                tracing::warn!(attempt, error = %e, "mail send retry");
+            Err(e) => {
+                last_err = e;
+                if attempt < MAX_RETRIES - 1 {
+                    tokio::time::sleep(std::time::Duration::from_secs(2u64.pow(attempt + 1))).await;
+                    tracing::warn!(attempt, error = %last_err, "mail send retry");
+                }
             }
-            Err(e) => return Err(e),
         }
     }
-    unreachable!()
+    Err(last_err)
 }

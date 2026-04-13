@@ -9,6 +9,7 @@ use framework::error::{AppError, BusinessCheckOption, IntoAppError};
 use framework::response::ResponseCode;
 use sqlx::PgPool;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Send a single SMS.
 #[tracing::instrument(skip_all, fields(mobile = %dto.mobile, template_code = %dto.template_code))]
@@ -57,8 +58,8 @@ pub async fn send(state: &AppState, dto: SendSmsDto) -> Result<SendSmsResponseDt
     .into_internal()?;
 
     // 5. Create SMS client
-    let sms_client =
-        client::create_client(&channel.code, &channel.api_key, &channel.api_secret)?;
+    let sms_client: Arc<dyn SmsClient> =
+        Arc::from(client::create_client(&channel.code, &channel.api_key, &channel.api_secret)?);
 
     // 6. Build send params and spawn background task
     let sms_params = SmsSendParams {
@@ -115,7 +116,9 @@ pub async fn batch_send(
     )?;
     let rendered_content = template_parser::render(&template.content, &params);
 
-    // 3. For each mobile: insert log, spawn task
+    // 3. Create client once for the batch
+    let sms_client: Arc<dyn SmsClient> =
+        Arc::from(client::create_client(&channel.code, &channel.api_key, &channel.api_secret)?);
     let count = dto.mobiles.len() as i32;
     let params_json = serde_json::to_string(&params).ok();
 
@@ -135,8 +138,6 @@ pub async fn batch_send(
         .await
         .into_internal()?;
 
-        let sms_client =
-            client::create_client(&channel.code, &channel.api_key, &channel.api_secret)?;
         let sms_params = SmsSendParams {
             mobile,
             signature: channel.signature.clone(),
@@ -146,9 +147,10 @@ pub async fn batch_send(
         let pg = state.pg.clone();
         let sem = state.sms_semaphore.clone();
         let log_id = log.id;
+        let client = sms_client.clone();
         tokio::spawn(async move {
             let _permit = sem.acquire().await.expect("semaphore closed");
-            execute_sms_send(&pg, log_id, sms_client, sms_params).await;
+            execute_sms_send(&pg, log_id, client, sms_params).await;
         });
     }
 
@@ -188,8 +190,8 @@ pub async fn resend(state: &AppState, log_id: i64) -> Result<(), AppError> {
         .into_internal()?;
 
     // 5. Rebuild params from log snapshot and create client
-    let sms_client =
-        client::create_client(&channel.code, &channel.api_key, &channel.api_secret)?;
+    let sms_client: Arc<dyn SmsClient> =
+        Arc::from(client::create_client(&channel.code, &channel.api_key, &channel.api_secret)?);
 
     // Reconstruct template params from the log's JSON snapshot
     let template_params: HashMap<String, String> = log
@@ -198,7 +200,7 @@ pub async fn resend(state: &AppState, log_id: i64) -> Result<(), AppError> {
         .and_then(|p| serde_json::from_str(p).ok())
         .unwrap_or_default();
 
-    // Find template to get api_template_id
+    // Find template to get api_template_id (not yet snapshotted in log)
     let template = SmsTemplateRepo::find_by_id(&state.pg, log.template_id)
         .await
         .into_internal()?
@@ -230,7 +232,7 @@ pub async fn resend(state: &AppState, log_id: i64) -> Result<(), AppError> {
 async fn execute_sms_send(
     pg: &PgPool,
     log_id: i64,
-    client: Box<dyn SmsClient>,
+    client: Arc<dyn SmsClient>,
     params: SmsSendParams,
 ) {
     const MAX_RETRIES: u32 = 3;
@@ -238,15 +240,16 @@ async fn execute_sms_send(
     let mut last_err = String::new();
     for attempt in 0..MAX_RETRIES {
         if attempt > 0 {
-            let delay = std::time::Duration::from_millis(500 * 2u64.pow(attempt - 1));
+            let delay = std::time::Duration::from_secs(2u64.pow(attempt));
             tokio::time::sleep(delay).await;
         }
 
         let result = client.send(params.clone()).await;
         if result.success {
-            SmsLogRepo::update_status(pg, log_id, 1, result.api_send_code.as_deref(), None)
-                .await
-                .ok();
+            tracing::info!(log_id, "sms sent successfully");
+            if let Err(e) = SmsLogRepo::update_status(pg, log_id, 1, result.api_send_code.as_deref(), None).await {
+                tracing::error!(log_id, error = %e, "failed to update sms log status to SUCCESS");
+            }
             return;
         }
 
@@ -262,7 +265,8 @@ async fn execute_sms_send(
     }
 
     // All retries exhausted — mark as failed
-    SmsLogRepo::update_status(pg, log_id, 2, None, Some(&last_err))
-        .await
-        .ok();
+    tracing::error!(log_id, error = %last_err, "sms send failed after retries");
+    if let Err(e) = SmsLogRepo::update_status(pg, log_id, 2, None, Some(&last_err)).await {
+        tracing::error!(log_id, error = %e, "failed to update sms log status to FAILED");
+    }
 }

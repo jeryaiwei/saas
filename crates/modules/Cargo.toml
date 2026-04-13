@@ -24,6 +24,11 @@ chrono.workspace = true
 async-trait.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
+reqwest.workspace = true
+hmac.workspace = true
+sha1.workspace = true
+hex.workspace = true
+base64.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true }

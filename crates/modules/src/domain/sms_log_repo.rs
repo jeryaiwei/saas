@@ -159,7 +159,8 @@ impl SmsLogRepo {
             UPDATE sys_sms_log \
             SET send_status = $2, \
                 api_send_code = $3, \
-                error_msg = $4 \
+                error_msg = $4, \
+                send_time = CASE WHEN $2 = 1 THEN CURRENT_TIMESTAMP ELSE send_time END \
             WHERE id = $1";
         let affected = sqlx::query(sql)
             .bind(id)

@@ -36,3 +36,7 @@ async-trait.workspace = true
 rand.workspace = true
 utoipa.workspace = true
 lettre.workspace = true
+aes.workspace = true
+cbc.workspace = true
+scrypt.workspace = true
+hex.workspace = true

@@ -377,7 +377,7 @@ pub struct SysNotifyMessage {
     pub update_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Clone, FromRow, Serialize)]
 pub struct SysSmsChannel {
     pub id: i32,
     pub code: String,
@@ -393,6 +393,19 @@ pub struct SysSmsChannel {
     pub update_by: String,
     pub update_at: DateTime<Utc>,
     pub del_flag: String,
+}
+
+impl std::fmt::Debug for SysSmsChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SysSmsChannel")
+            .field("id", &self.id)
+            .field("code", &self.code)
+            .field("name", &self.name)
+            .field("api_key", &"******")
+            .field("api_secret", &"******")
+            .field("status", &self.status)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]
@@ -434,7 +447,7 @@ pub struct SysSmsLog {
     pub error_msg: Option<String>,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Clone, FromRow, Serialize)]
 pub struct SysMailAccount {
     pub id: i32,
     pub mail: String,
@@ -450,6 +463,19 @@ pub struct SysMailAccount {
     pub update_by: String,
     pub update_at: DateTime<Utc>,
     pub del_flag: String,
+}
+
+impl std::fmt::Debug for SysMailAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SysMailAccount")
+            .field("id", &self.id)
+            .field("mail", &self.mail)
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("password", &"******")
+            .field("status", &self.status)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]

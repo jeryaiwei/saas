@@ -40,6 +40,9 @@ redis_keys:
   user_token_version: "user_token_version:"
   login_session: "login_token_session:"
 
+mail:
+  mail_password_key: "mail-password-encryption-key-32b"
+
 # TTLs in seconds — MUST match NestJS values
 redis_ttl:
   captcha: 300                     # 5 min

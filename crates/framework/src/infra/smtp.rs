@@ -7,15 +7,31 @@
 use lettre::message::{header::ContentType, Mailbox};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
+use std::time::Duration;
+
+/// SMTP connection + read timeout per attempt.
+const SMTP_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// SMTP connection parameters (derived from `SysMailAccount`).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SmtpParams {
     pub host: String,
     pub port: u16,
     pub ssl_enable: bool,
     pub username: String,
     pub password: String,
+}
+
+impl std::fmt::Debug for SmtpParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SmtpParams")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("ssl_enable", &self.ssl_enable)
+            .field("username", &self.username)
+            .field("password", &"******")
+            .finish()
+    }
 }
 
 /// A single outbound email message.
@@ -31,7 +47,7 @@ pub struct MailMessage {
 /// Send a single email (blocking). Returns `Ok(())` on success or an
 /// error string describing the failure.
 pub fn send_mail(smtp: &SmtpParams, msg: &MailMessage) -> Result<(), String> {
-    let from: Mailbox = format!("{} <{}>", msg.from_name, msg.from_mail)
+    let from: Mailbox = format!("\"{}\" <{}>", msg.from_name.replace('"', ""), msg.from_mail)
         .parse()
         .map_err(|e| format!("invalid from address: {e}"))?;
 
@@ -55,11 +71,13 @@ pub fn send_mail(smtp: &SmtpParams, msg: &MailMessage) -> Result<(), String> {
             .map_err(|e| format!("smtp relay: {e}"))?
             .port(smtp.port)
             .credentials(creds)
+            .timeout(Some(SMTP_TIMEOUT))
             .build()
     } else {
         SmtpTransport::builder_dangerous(&smtp.host)
             .port(smtp.port)
             .credentials(creds)
+            .timeout(Some(SMTP_TIMEOUT))
             .build()
     };
 
