@@ -6,7 +6,9 @@ use super::dto::{
 };
 use crate::domain::UserRepo;
 use crate::state::AppState;
+use anyhow::Context;
 use framework::auth::{jwt, session, JwtClaims, UserSession};
+use framework::constants::PLATFORM_ID_DEFAULT;
 use framework::error::{AppError, BusinessCheckOption, IntoAppError};
 use framework::infra::{captcha, crypto};
 use framework::response::ResponseCode;
@@ -40,24 +42,75 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
         return Err(AppError::business(ResponseCode::INVALID_CREDENTIALS));
     }
 
-    // 4. Resolve tenant binding — default > first active
+    // 4. Resolve tenant binding.
+    //    Priority: super admin → explicit tenantId → default binding → platformId fallback.
     let user_tenants = UserRepo::find_user_tenants(&state.pg, &user.user_id)
         .await
         .into_internal()?;
 
-    let (chosen_tenant_id, is_admin) = match user_tenants.iter().find(|t| t.is_default_flag()) {
-        Some(t) => (Some(t.tenant_id.clone()), t.is_admin_flag()),
-        None => match user_tenants.first() {
+    let is_super_admin = user_tenants
+        .iter()
+        .any(|t| t.tenant_id == PLATFORM_ID_DEFAULT && t.is_admin_flag());
+
+    let (chosen_tenant_id, is_admin) = if is_super_admin {
+        // Super admin: use explicit tenantId or default to super tenant
+        let tid = dto
+            .tenant_id
+            .unwrap_or_else(|| PLATFORM_ID_DEFAULT.to_string());
+        (Some(tid), true)
+    } else if let Some(explicit_tid) = &dto.tenant_id {
+        // Explicit tenant selection: verify binding exists
+        match user_tenants.iter().find(|t| t.tenant_id == *explicit_tid) {
             Some(t) => (Some(t.tenant_id.clone()), t.is_admin_flag()),
-            None => (None, false),
-        },
+            None => return Err(AppError::business(ResponseCode::TENANT_BINDING_NOT_FOUND)),
+        }
+    } else {
+        // Default binding → first binding → platformId fallback
+        match user_tenants.iter().find(|t| t.is_default_flag()) {
+            Some(t) => (Some(t.tenant_id.clone()), t.is_admin_flag()),
+            None => match user_tenants.first() {
+                Some(t) => (Some(t.tenant_id.clone()), t.is_admin_flag()),
+                None => (Some(user.platform_id.clone()), false),
+            },
+        }
     };
 
-    // 5. Permissions.
-    //    - Admins on any tenant → every menu permission (NestJS behavior;
-    //      Phase 2 will apply the tenant-package menu filter).
-    //    - Non-admins → user → role → role-menu → menu join.
+    // 4b. Validate tenant status (skip for super tenant).
+    if let Some(tid) = chosen_tenant_id.as_deref() {
+        if tid != PLATFORM_ID_DEFAULT {
+            let tenant_row: Option<(String, Option<chrono::DateTime<chrono::Utc>>)> =
+                sqlx::query_as(
+                    "SELECT status, expire_time FROM sys_tenant \
+                     WHERE tenant_id = $1 AND del_flag = '0'",
+                )
+                .bind(tid)
+                .fetch_optional(&state.pg)
+                .await
+                .context("login: check tenant status")
+                .into_internal()?;
+
+            match tenant_row {
+                Some((status, expire_time)) => {
+                    if status != "0" {
+                        return Err(AppError::business(ResponseCode::TENANT_NOT_FOUND));
+                    }
+                    if let Some(exp) = expire_time {
+                        if exp < chrono::Utc::now() {
+                            return Err(AppError::business(ResponseCode::TENANT_EXPIRED));
+                        }
+                    }
+                }
+                None => return Err(AppError::business(ResponseCode::TENANT_NOT_FOUND)),
+            }
+        }
+    }
+
+    // 5. Permissions — scoped by tenant package.
+    //    - Admins → all menu perms within package range.
+    //    - Non-admins → role-assigned perms ∩ package range.
     //    - No tenant binding → empty list.
+    //    Both resolve_all_menu_perms and resolve_role_permissions already
+    //    LEFT JOIN sys_tenant_package and filter by menuIds.
     let permissions = match chosen_tenant_id.as_deref() {
         Some(tid) if is_admin => UserRepo::resolve_all_menu_perms(&state.pg, tid)
             .await
@@ -75,12 +128,26 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
         None => Vec::new(),
     };
 
+    // 5b. Resolve sys_code from tenant's package.
+    let sys_code = match chosen_tenant_id.as_deref() {
+        Some(tid) => {
+            let row: Option<(Option<String>,)> = sqlx::query_as(
+                "SELECT p.code FROM sys_tenant t \
+                 LEFT JOIN sys_tenant_package p ON t.package_id = p.package_id \
+                   AND p.del_flag = '0' AND p.status = '0' \
+                 WHERE t.tenant_id = $1 AND t.del_flag = '0'",
+            )
+            .bind(tid)
+            .fetch_optional(&state.pg)
+            .await
+            .context("login: resolve sys_code")
+            .into_internal()?;
+            row.and_then(|(code,)| code)
+        }
+        None => None,
+    };
+
     // 6. Build session and persist under a fresh uuid.
-    //
-    // `user_id`, `user_type`, and `chosen_tenant_id` are still cloned here
-    // because they're moved into `JwtClaims` below. The other fields
-    // (`user_name`, `platform_id`, `lang`) are moved directly — `user` is
-    // never read again after this struct literal, so partial-move is safe.
     let session_uuid = uuid::Uuid::new_v4().to_string();
     let sess = UserSession {
         user_id: user.user_id.clone(),
@@ -88,7 +155,7 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
         user_type: user.user_type.clone(),
         tenant_id: chosen_tenant_id.clone(),
         platform_id: Some(user.platform_id),
-        sys_code: None,
+        sys_code,
         lang: user.lang,
         is_admin,
         permissions,

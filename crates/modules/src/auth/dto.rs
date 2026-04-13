@@ -35,6 +35,7 @@ pub struct RefreshTokenDto {
 }
 
 #[derive(Debug, Deserialize, Validate, utoipa::ToSchema, utoipa::IntoParams)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginDto {
     #[validate(length(min = 1, max = 64))]
     pub username: String,
@@ -44,6 +45,10 @@ pub struct LoginDto {
     pub captcha_id: Option<String>,
     #[serde(default)]
     pub captcha_code: Option<String>,
+    /// Optional tenant selection for login. If omitted, uses the user's
+    /// default tenant binding or falls back to platformId.
+    #[serde(default)]
+    pub tenant_id: Option<String>,
 }
 
 /// Matches NestJS `LoginTokenResponseDto` — **snake_case** on the wire
