@@ -7,8 +7,8 @@
 | 端点数   | 192 (system 88 + message 55 + monitor 13 + auth 6 + health 9 + common 4 + file 17)                                                                     |
 | 模块数   | 31 (system 12 + message 11 + monitor 5 + auth 1 + health 1 + upload 1)                                                                                 |
 | 测试数   | 326                                                                                                                                                    |
-| Smoke    | 12 scripts, 119 steps (role 14 + user 16 + tenant 13 + menu 10 + dept 8 + post 8 + config 9 + dict 11 + notice 7 + notify 12 + operlog 6 + loginlog 5) |
-| 框架规范 | 8 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog / tenant)                                   |
+| Smoke    | 15 scripts, 136 steps (role 14 + user 16 + tenant 13 + menu 10 + dept 8 + post 8 + config 9 + dict 11 + notice 7 + notify 12 + operlog 6 + loginlog 5 + upload 7 + mail-send 6 + sms-send 4) |
+| 框架规范 | 10 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog / tenant / redis / storage)                 |
 | 业务设计 | 6 份 (role / user / tenant / menu / dept / mail-sms-send)                                                                                              |
 | Swagger  | /swagger-ui (Bearer JWT, 中文 tag/summary)                                                                                                             |
 | Operlog  | 72 写路由自动记录操作日志                                                                                                                              |
@@ -31,6 +31,8 @@
 | [openapi-spec](framework/framework-openapi-spec.md)               | v1.0        | utoipa + OpenApiRouter 架构, DTO derive 规范, handler 注解, router 注册, 权限模式, 中文 tag                                   |
 | [operlog-spec](framework/framework-operlog-spec.md)               | v1.1        | 操作日志路由级设计 (OperlogLayer + Extension&lt;PgPool&gt;), BusinessType, 65 写路由覆盖                                      |
 | [tenant-spec](framework/framework-tenant-spec.md)                 | v1.0        | 三层租户架构, 套餐绑定, 管理员层级, 权限计算, 租户切换, Session 结构, 数据过滤模型                                            |
+| [redis-spec](framework/framework-redis-spec.md)                   | v1.0        | RedisExt trait (9 方法), 强类型操作规范, JSON/raw 读写, 连接管理, Key 命名约定                                                |
+| [storage-spec](framework/framework-storage-spec.md)               | v1.0        | StorageProvider trait, local/OSS/COS 三实现, 上传流程, 客户端直传, 安全规范, 新 Provider 指南                                 |
 
 ### 其他
 
@@ -155,7 +157,7 @@ cargo build -p app
 open http://127.0.0.1:18080/swagger-ui/
 
 # 测试
-cargo test --workspace                 # 326 tests
+cargo test --workspace                 # 339 tests
 cargo clippy --all-targets
 cargo fmt --check
 
@@ -175,6 +177,9 @@ bash scripts/smoke-notice-module.sh    #  7 steps
 bash scripts/smoke-notify-module.sh    # 12 steps
 bash scripts/smoke-operlog-module.sh   #  6 steps
 bash scripts/smoke-loginlog-module.sh  #  5 steps
+bash scripts/smoke-upload-module.sh   #  7 steps
+bash scripts/smoke-mail-send-module.sh #  6 steps
+bash scripts/smoke-sms-send-module.sh  #  4 steps
 
 # Git
 git remote -v                          # github: jeryaiwei/saas.git

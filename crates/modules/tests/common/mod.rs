@@ -336,3 +336,18 @@ pub async fn cleanup_test_login_logs(pool: &PgPool, prefix: &str) {
         .await
         .expect("cleanup sys_logininfor");
 }
+
+/// Cleanup helper — delete test uploads.
+/// Matches `sys_upload.file_name LIKE '{prefix}%'`.
+pub async fn cleanup_test_uploads(pool: &PgPool, prefix: &str) {
+    assert!(
+        !prefix.is_empty(),
+        "cleanup_test_uploads: prefix must not be empty"
+    );
+    let pattern = format!("{prefix}%");
+    sqlx::query("DELETE FROM sys_upload WHERE file_name LIKE $1")
+        .bind(&pattern)
+        .execute(pool)
+        .await
+        .expect("cleanup sys_upload");
+}
