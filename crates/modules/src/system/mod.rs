@@ -1,5 +1,5 @@
 //! System management endpoints — config, dept, dict, menu, post, role,
-//! tenant, tenant_package, user, audit_log.
+//! tenant, tenant_package, tenant_dashboard, user, audit_log.
 
 pub mod audit_log;
 pub mod config;
@@ -9,5 +9,6 @@ pub mod menu;
 pub mod post;
 pub mod role;
 pub mod tenant;
+pub mod tenant_dashboard;
 pub mod tenant_package;
 pub mod user;

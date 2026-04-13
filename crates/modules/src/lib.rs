@@ -33,6 +33,7 @@ fn api_openapi_router() -> OpenApiRouter<AppState> {
         .merge(system::role::router())
         .merge(system::tenant::router())
         .merge(system::tenant_package::router())
+        .merge(system::tenant_dashboard::router())
         .merge(system::user::router())
         // message
         .merge(message::notice::router())
@@ -49,6 +50,7 @@ fn api_openapi_router() -> OpenApiRouter<AppState> {
         .merge(monitor::login_log::router())
         .merge(monitor::online_user::router())
         .merge(monitor::server_info::router())
+        .merge(monitor::cache::router())
 }
 
 /// Split into axum Router + OpenAPI spec. Called by `app::main`.

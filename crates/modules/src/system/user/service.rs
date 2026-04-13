@@ -2,9 +2,9 @@
 
 use super::dto::{
     AuthRoleResponseDto, AuthRoleUpdateDto, ChangeUserStatusDto, CreateUserDto, DeptTreeNodeDto,
-    ListUserDto, ResetPwdDto, UpdatePwdDto, UpdateProfileDto, UpdateUserDto,
-    UserDetailResponseDto, UserInfoResponseDto, UserListItemResponseDto, UserOptionQueryDto,
-    UserOptionResponseDto, UserProfileGetResponseDto, UserProfileResponseDto,
+    ListUserDto, ResetPwdDto, UpdateProfileDto, UpdatePwdDto, UpdateUserDto, UserDetailResponseDto,
+    UserInfoResponseDto, UserListItemResponseDto, UserOptionQueryDto, UserOptionResponseDto,
+    UserProfileGetResponseDto, UserProfileResponseDto,
 };
 use crate::domain::{
     DeptRepo, RoleRepo, TenantRepo, UserInsertParams, UserListFilter, UserRepo, UserUpdateParams,
