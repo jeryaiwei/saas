@@ -244,9 +244,9 @@ impl NotifyMessageRepo {
             "INSERT INTO sys_notify_message (\
                 tenant_id, user_id, user_type, template_id, template_code, \
                 template_nickname, template_content, template_params, \
-                read_status, del_flag\
+                read_status, del_flag, update_at\
             ) VALUES (\
-                $1, $2, $3, $4, $5, $6, $7, $8, false, '0'\
+                $1, $2, $3, $4, $5, $6, $7, $8, false, '0', CURRENT_TIMESTAMP\
             ) RETURNING {COLUMNS}"
         );
         let row = sqlx::query_as::<_, SysNotifyMessage>(&sql)

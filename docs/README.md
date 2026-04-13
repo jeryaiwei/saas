@@ -4,13 +4,14 @@
 
 | 指标 | 值 |
 | --- | --- |
-| 端点数 | 78 (auth 4 + role 11 + user 11 + tenant 5 + tenant_package 6 + menu 9 + dept 7 + post 6 + config 7 + dict 12) |
-| 测试数 | 293 |
+| 端点数 | 133 (system 65 + message 48 + monitor 7 + auth 4 + health 9) |
+| 模块数 | 22 (system 9 + message 9 + monitor 2 + auth 1 + health 1) |
+| 测试数 | 304 |
 | Smoke | role 14 + user 16 + tenant 13 + menu 10 + dept 8 = 61 steps |
 | 框架规范 | 7 份 (pagination / error-envelope / observability / repo-executor / pagination-indexes / openapi / operlog) |
 | 业务设计 | 5 份 (role / user / tenant / menu / dept) |
-| 实施计划 | 8 份 (7 已执行 + 1 未执行) |
-| Swagger | /swagger-ui (58 paths, 88 schemas, Bearer JWT auth) |
+| Swagger | /swagger-ui (Bearer JWT, 中文 tag/summary) |
+| Operlog | 43 写路由自动记录操作日志 |
 
 ---
 
@@ -71,10 +72,12 @@ server-rs/
 ├── crates/
 │   ├── framework/     跨切面基础设施 (config, context, error, extractors,
 │   │                  i18n, infra, middleware, response, telemetry, testing)
-│   ├── modules/       业务模块 (auth, system/{role,user,tenant,tenant_package,
-│   │                  menu,dept,post,config,dict})
-│   │                  + domain 层 (entities, *_repo, validators, constants)
-│   │                  + openapi.rs (全局 info/tags/security)
+│   ├── modules/       业务模块
+│   │                  system/ (config,dept,dict,menu,post,role,tenant,tenant_package,user)
+│   │                  message/ (notice,notify_template,notify_message,mail_account,
+│   │                           mail_template,mail_log,sms_channel,sms_template,sms_log)
+│   │                  monitor/ (oper_log,login_log)
+│   │                  + auth/ + health/ + domain/ (22 repos) + openapi.rs
 │   └── app/           二进制入口 (main.rs, middleware 组装, swagger-ui, CORS)
 ├── config/            YAML 配置 (default + development)
 ├── i18n/              国际化 (zh-CN.json + en-US.json)
@@ -172,7 +175,7 @@ cargo build -p app
 open http://127.0.0.1:18080/swagger-ui/
 
 # 测试
-cargo test --workspace                 # 293 tests
+cargo test --workspace                 # 304 tests
 cargo clippy --all-targets
 cargo fmt --check
 
@@ -192,8 +195,10 @@ git push github main
 
 ## 下一步
 
-1. **P6**: Vue Web 灰度切换 — menu + dept 已就绪
-2. **P7**: Notice / Log 模块 — 后台通知、操作日志 CRUD
+1. **P2: Vue Web 灰度切换** — 133 端点覆盖管理端 CRUD，按模块切 vite proxy
+2. **P3: Audit Log** — 4 端点只读，补齐 monitor
+3. **P4: File Manager** — Phase 1 文件夹+列表, Phase 2 上传/下载
+4. **P5: Mail Send / SMS Send** — 对接外部服务，延后
 
 **触发器表** (不主动做, 等条件满足):
 
