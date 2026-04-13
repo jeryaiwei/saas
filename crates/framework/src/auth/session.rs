@@ -185,6 +185,79 @@ pub async fn bump_user_token_version(
     Ok(new_ver)
 }
 
+// ─── Tenant switch original state ────────────────────────────────────────
+
+/// Snapshot of session state before a tenant switch. Stored in Redis
+/// under `tenant:switch:original:{uuid}` so `dynamic/clear` can restore
+/// without recalculating permissions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwitchOriginal {
+    pub tenant_id: String,
+    pub is_admin: bool,
+    pub permissions: Vec<String>,
+    pub sys_code: Option<String>,
+    pub switched_at: String,
+}
+
+const SWITCH_ORIGINAL_PREFIX: &str = "tenant:switch:original:";
+
+/// Save the pre-switch state so `dynamic/clear` can restore it.
+#[tracing::instrument(skip_all, fields(uuid = %uuid))]
+pub async fn store_switch_original(
+    pool: &RedisPool,
+    uuid: &str,
+    original: &SwitchOriginal,
+    ttl_sec: u64,
+) -> anyhow::Result<()> {
+    let key = format!("{SWITCH_ORIGINAL_PREFIX}{uuid}");
+    let json = serde_json::to_string(original).context("serialize switch original")?;
+    let mut conn = pool.get().await.context("redis get conn")?;
+    let _: () = redis::cmd("SETEX")
+        .arg(&key)
+        .arg(ttl_sec)
+        .arg(&json)
+        .query_async(&mut conn)
+        .await
+        .context("redis SETEX switch original")?;
+    Ok(())
+}
+
+/// Fetch the pre-switch state. Returns `None` if user hasn't switched.
+#[tracing::instrument(skip_all, fields(uuid = %uuid))]
+pub async fn fetch_switch_original(
+    pool: &RedisPool,
+    uuid: &str,
+) -> anyhow::Result<Option<SwitchOriginal>> {
+    let key = format!("{SWITCH_ORIGINAL_PREFIX}{uuid}");
+    let mut conn = pool.get().await.context("redis get conn")?;
+    let raw: Option<String> = redis::cmd("GET")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .context("redis GET switch original")?;
+    match raw {
+        Some(json) => {
+            let orig = serde_json::from_str(&json).context("deserialize switch original")?;
+            Ok(Some(orig))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Delete the pre-switch state after restore.
+#[tracing::instrument(skip_all, fields(uuid = %uuid))]
+pub async fn delete_switch_original(pool: &RedisPool, uuid: &str) -> anyhow::Result<()> {
+    let key = format!("{SWITCH_ORIGINAL_PREFIX}{uuid}");
+    let mut conn = pool.get().await.context("redis get conn")?;
+    let _: i64 = redis::cmd("DEL")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .context("redis DEL switch original")?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
