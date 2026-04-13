@@ -82,6 +82,26 @@ pub struct MenuUpdateParams {
     pub remark: Option<String>,
 }
 
+/// Lightweight projection for building router menu trees — only the fields
+/// needed for the `GET /routers` endpoint.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct RouterMenuItem {
+    pub menu_id: String,
+    pub menu_name: String,
+    pub parent_id: Option<String>,
+    pub order_num: i32,
+    pub path: String,
+    pub component: Option<String>,
+    pub query: Option<String>,
+    pub is_frame: String,
+    pub is_cache: String,
+    pub menu_type: String,
+    pub visible: String,
+    pub status: String,
+    pub perms: String,
+    pub icon: Option<String>,
+}
+
 /// Repository for `sys_menu`. See module docs for the DAO conventions.
 pub struct MenuRepo;
 
@@ -357,6 +377,65 @@ impl MenuRepo {
         .rows_affected();
 
         Ok(affected)
+    }
+
+    /// Return active menus for an admin user, filtered by tenant package.
+    /// Used for `GET /routers` when the user is a tenant admin.
+    #[instrument(skip_all, fields(tenant_id = %tenant_id))]
+    pub async fn find_user_routers_admin(
+        executor: impl sqlx::PgExecutor<'_>,
+        tenant_id: &str,
+    ) -> anyhow::Result<Vec<RouterMenuItem>> {
+        let rows = sqlx::query_as::<_, RouterMenuItem>(
+            "SELECT DISTINCT m.menu_id, m.menu_name, m.parent_id, m.order_num, m.path, \
+                    m.component, NULLIF(m.query, '') AS query, m.is_frame, m.is_cache, m.menu_type, \
+                    m.visible, m.status, m.perms, NULLIF(m.icon, '') AS icon \
+               FROM sys_menu m \
+               INNER JOIN sys_tenant t ON t.tenant_id = $1 \
+               INNER JOIN sys_tenant_package p ON t.package_id = p.package_id \
+                 AND p.del_flag = '0' AND p.status = '0' \
+              WHERE m.del_flag = '0' AND m.status = '0' \
+                AND (p.menu_ids IS NULL OR m.menu_id = ANY(p.menu_ids)) \
+              ORDER BY m.order_num ASC",
+        )
+        .bind(tenant_id)
+        .fetch_all(executor)
+        .await
+        .context("find_user_routers_admin: select sys_menu")?;
+        Ok(rows)
+    }
+
+    /// Return active menus for a normal user, filtered by user roles + tenant package.
+    /// Used for `GET /routers`.
+    #[instrument(skip_all, fields(user_id = %user_id, tenant_id = %tenant_id))]
+    pub async fn find_user_routers(
+        executor: impl sqlx::PgExecutor<'_>,
+        user_id: &str,
+        tenant_id: &str,
+    ) -> anyhow::Result<Vec<RouterMenuItem>> {
+        let rows = sqlx::query_as::<_, RouterMenuItem>(
+            "SELECT DISTINCT m.menu_id, m.menu_name, m.parent_id, m.order_num, m.path, \
+                    m.component, NULLIF(m.query, '') AS query, m.is_frame, m.is_cache, m.menu_type, \
+                    m.visible, m.status, m.perms, NULLIF(m.icon, '') AS icon \
+               FROM sys_menu m \
+               INNER JOIN sys_role_menu rm ON m.menu_id = rm.menu_id \
+               INNER JOIN sys_user_role ur ON rm.role_id = ur.role_id \
+               INNER JOIN sys_role r ON r.role_id = rm.role_id \
+                 AND r.tenant_id = $2 AND r.del_flag = '0' AND r.status = '0' \
+               INNER JOIN sys_tenant t ON t.tenant_id = $2 \
+               INNER JOIN sys_tenant_package p ON t.package_id = p.package_id \
+                 AND p.del_flag = '0' AND p.status = '0' \
+              WHERE ur.user_id = $1 \
+                AND m.del_flag = '0' AND m.status = '0' \
+                AND (p.menu_ids IS NULL OR m.menu_id = ANY(p.menu_ids)) \
+              ORDER BY m.order_num ASC",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .fetch_all(executor)
+        .await
+        .context("find_user_routers: select sys_menu")?;
+        Ok(rows)
     }
 
     /// Soft-delete a menu and all its descendants using a recursive CTE.

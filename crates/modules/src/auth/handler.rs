@@ -7,6 +7,7 @@
 //! - `POST /auth/refresh-token`  — public
 //! - `POST /auth/logout`         — authenticated
 //! - `GET  /info`                — authenticated
+//! - `GET  /routers`             — authenticated (menu tree for current user)
 
 use super::{dto, service};
 use crate::state::AppState;
@@ -90,7 +91,23 @@ pub(crate) async fn refresh_token(
     Ok(ApiResponse::ok(resp))
 }
 
+#[utoipa::path(get, path = "/routers", tag = "认证",
+    summary = "获取路由菜单树",
+    responses((status = 200, description = "router tree JSON"))
+)]
+pub(crate) async fn get_routers(
+    State(state): State<AppState>,
+    Extension(session): Extension<UserSession>,
+) -> Result<ApiResponse<serde_json::Value>, AppError> {
+    let routers = service::get_routers(&state, &session).await?;
+    let value = serde_json::to_value(&routers)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize routers: {e}")))?;
+    Ok(ApiResponse::ok(value))
+}
+
 pub fn router() -> OpenApiRouter<AppState> {
+    // Split into two routers to reduce type nesting depth
+    // (avoids stack overflow in debug mode from deep Future state machines)
     OpenApiRouter::new()
         .routes(routes!(login))
         .routes(routes!(get_code))
@@ -98,4 +115,5 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(refresh_token))
         .routes(routes!(logout))
         .routes(routes!(get_info))
+        .routes(routes!(get_routers))
 }

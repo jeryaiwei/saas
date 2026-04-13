@@ -1,10 +1,12 @@
-//! Auth service — login / logout / get-info / tenant-list / refresh-token business logic.
+//! Auth service — login / logout / get-info / tenant-list / refresh-token / get-routers business logic.
 
 use super::dto::{
     CaptchaCodeResponseDto, CurrentUserInfoResponseDto, LoginDto, LoginTokenResponseDto,
-    RefreshTokenDto, TenantListForLoginDto, TenantVo,
+    RefreshTokenDto, RouterConfig, RouterMeta, TenantListForLoginDto, TenantVo,
+    UserProfileDto,
 };
-use crate::domain::UserRepo;
+use crate::domain::menu_repo::RouterMenuItem;
+use crate::domain::{MenuRepo, UserRepo};
 use crate::state::AppState;
 use anyhow::Context;
 use framework::auth::{jwt, session, JwtClaims, UserSession};
@@ -12,6 +14,7 @@ use framework::constants::SUPER_TENANT_ID;
 use framework::error::{AppError, BusinessCheckOption, IntoAppError};
 use framework::infra::{captcha, crypto};
 use framework::response::ResponseCode;
+use std::collections::HashMap;
 
 #[tracing::instrument(skip_all, fields(username = %dto.username))]
 pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponseDto, AppError> {
@@ -151,6 +154,10 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
         user_id: user.user_id.clone(),
         user_name: user.user_name,
         user_type: user.user_type.clone(),
+        nick_name: user.nick_name,
+        avatar: user.avatar,
+        email: user.email,
+        phonenumber: user.phonenumber,
         tenant_id: chosen_tenant_id.clone(),
         platform_id: Some(user.platform_id),
         sys_code,
@@ -232,26 +239,25 @@ pub async fn logout(state: &AppState, claims: &JwtClaims) -> Result<(), AppError
 
 #[tracing::instrument(skip_all, fields(user_id = %session.user_id))]
 pub async fn get_info(
-    state: &AppState,
+    _state: &AppState,
     session: &UserSession,
 ) -> Result<CurrentUserInfoResponseDto, AppError> {
-    // Refresh the user row from DB so profile fields stay current.
-    let user = UserRepo::find_by_id(&state.pg, &session.user_id)
-        .await
-        .into_internal()?
-        .or_business(ResponseCode::USER_NOT_FOUND)?;
-
+    // All profile fields are stored in the Redis session (set at login),
+    // so no DB query needed. Trade-off: profile edits require re-login
+    // or session refresh to take effect.
     Ok(CurrentUserInfoResponseDto {
-        user_id: user.user_id,
-        user_name: user.user_name,
-        nick_name: user.nick_name,
-        avatar: user.avatar,
-        email: user.email,
-        phonenumber: user.phonenumber,
-        user_type: user.user_type,
-        tenant_id: session.tenant_id.clone(),
-        platform_id: session.platform_id.clone(),
-        is_admin: session.is_admin,
+        user: UserProfileDto {
+            user_id: session.user_id.clone(),
+            user_name: session.user_name.clone(),
+            nick_name: session.nick_name.clone(),
+            avatar: session.avatar.clone(),
+            email: session.email.clone(),
+            phonenumber: session.phonenumber.clone(),
+            user_type: session.user_type.clone(),
+            tenant_id: session.tenant_id.clone(),
+            platform_id: session.platform_id.clone(),
+            is_admin: session.is_admin,
+        },
         roles: session.roles.clone(),
         permissions: session.permissions.clone(),
     })
@@ -363,6 +369,10 @@ pub async fn refresh_token(
         user_id: old_session.user_id.clone(),
         user_name: old_session.user_name,
         user_type: old_session.user_type.clone(),
+        nick_name: old_session.nick_name,
+        avatar: old_session.avatar,
+        email: old_session.email,
+        phonenumber: old_session.phonenumber,
         tenant_id: old_session.tenant_id.clone(),
         platform_id: old_session.platform_id,
         sys_code: old_session.sys_code,
@@ -403,4 +413,301 @@ pub async fn refresh_token(
         scope: None,
         openid: None,
     })
+}
+
+// ---------------------------------------------------------------------------
+// GET /routers — dynamic menu tree for the current user
+// ---------------------------------------------------------------------------
+
+/// Fetch the router menu tree for the current user.
+#[tracing::instrument(skip_all)]
+pub async fn get_routers(
+    state: &AppState,
+    session: &UserSession,
+) -> Result<Vec<RouterConfig>, AppError> {
+    let tenant_id = session.tenant_id.as_deref().unwrap_or_default();
+    let user_id = &session.user_id;
+
+    let menus = if session.is_admin {
+        MenuRepo::find_user_routers_admin(&state.pg, tenant_id)
+            .await
+            .into_internal()?
+    } else {
+        MenuRepo::find_user_routers(&state.pg, user_id, tenant_id)
+            .await
+            .into_internal()?
+    };
+
+    Ok(build_menus(&menus))
+}
+
+// ---------------------------------------------------------------------------
+// Menu tree builder — faithfully translated from NestJS `menu/utils.ts`
+// ---------------------------------------------------------------------------
+
+/// Menu type constants matching NestJS `user.constant.ts`.
+const TYPE_DIR: &str = "M";
+const TYPE_MENU: &str = "C";
+const NO_FRAME: &str = "1";
+const LAYOUT: &str = "Layout";
+const INNER_LINK: &str = "InnerLink";
+const PARENT_VIEW: &str = "ParentView";
+
+/// Capitalize the first character of `s` (ASCII-only, matching NestJS behavior).
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(c) => {
+            let upper: String = c.to_uppercase().collect();
+            let rest: String = chars.collect::<String>().to_lowercase();
+            format!("{upper}{rest}")
+        }
+    }
+}
+
+/// Check if `path` is a URL (starts with `http://` or `https://`).
+fn is_url(path: &str) -> bool {
+    path.starts_with("http://") || path.starts_with("https://")
+}
+
+/// Replace inner link special characters (matching NestJS `innerLinkReplaceEach`).
+/// Strips protocol + `www.` prefix, then replaces `.` and `:` with `/`.
+fn inner_link_replace_each(path: &str) -> String {
+    // Strip protocol
+    let s = path
+        .strip_prefix("https://")
+        .or_else(|| path.strip_prefix("http://"))
+        .unwrap_or(path);
+    // Strip www.
+    let s = s.strip_prefix("www.").unwrap_or(s);
+    // Replace . and : with /
+    s.chars()
+        .map(|c| if c == '.' || c == ':' { '/' } else { c })
+        .collect()
+}
+
+/// Pre-computed context for a menu item, avoiding repeated boolean checks.
+struct MenuContext {
+    is_root: bool,
+    is_dir: bool,
+    #[allow(dead_code)]
+    is_menu: bool,
+    is_no_frame: bool,
+    /// Root + menu + noFrame → special frame route
+    is_frame: bool,
+    /// NoFrame + path is URL → inner link
+    is_inner: bool,
+    /// Non-root + directory → ParentView
+    is_parent_view: bool,
+    meta: RouterMeta,
+}
+
+fn compute_menu_context(m: &RouterMenuItem) -> MenuContext {
+    let is_root = m
+        .parent_id
+        .as_deref()
+        .is_none_or(|p| p.is_empty() || p == "0");
+    let is_dir = m.menu_type == TYPE_DIR;
+    let is_menu = m.menu_type == TYPE_MENU;
+    let is_no_frame = m.is_frame == NO_FRAME;
+
+    let is_frame = is_root && is_menu && is_no_frame;
+    let is_inner = is_no_frame && is_url(&m.path);
+    let is_parent_view = !is_root && is_dir;
+
+    let meta = RouterMeta {
+        title: m.menu_name.clone(),
+        icon: m.icon.clone(),
+        no_cache: m.is_cache == "1",
+        link: None, // DB has no `link` column; leave None
+    };
+
+    MenuContext {
+        is_root,
+        is_dir,
+        is_menu,
+        is_no_frame,
+        is_frame,
+        is_inner,
+        is_parent_view,
+        meta,
+    }
+}
+
+/// Determine the component string (NestJS `getComponent`).
+fn get_component(m: &RouterMenuItem, ctx: &MenuContext) -> String {
+    if m.component.is_some() && !ctx.is_frame {
+        return m.component.clone().unwrap_or_default();
+    }
+    if m.component.is_none() && ctx.is_inner {
+        return INNER_LINK.to_string();
+    }
+    if m.component.is_none() && ctx.is_parent_view {
+        return PARENT_VIEW.to_string();
+    }
+    LAYOUT.to_string()
+}
+
+/// Determine the router path (NestJS `getRouterPath`).
+fn get_router_path(m: &RouterMenuItem, ctx: &MenuContext) -> String {
+    if ctx.is_frame {
+        return "/".to_string();
+    }
+    if ctx.is_root && ctx.is_inner {
+        return inner_link_replace_each(&m.path);
+    }
+    if ctx.is_root && ctx.is_dir && ctx.is_no_frame {
+        return format!("/{}", m.path);
+    }
+    m.path.clone()
+}
+
+/// Convert a flat list of `RouterMenuItem` into a tree of `RouterConfig`.
+///
+/// Algorithm (matches NestJS `buildMenus` in `menu/utils.ts`):
+/// 1. First pass: build all router nodes and record pending parent-child links.
+/// 2. Second pass: attach children to parents.
+fn build_menus(menus: &[RouterMenuItem]) -> Vec<RouterConfig> {
+    if menus.is_empty() {
+        return Vec::new();
+    }
+
+    let mut routers: Vec<RouterConfig> = Vec::with_capacity(menus.len());
+    let mut id_to_idx: HashMap<&str, usize> = HashMap::with_capacity(menus.len());
+    // (child_index, parent_id) pairs for non-root items
+    let mut pending_children: Vec<(usize, &str)> = Vec::new();
+    let mut root_indices: Vec<usize> = Vec::new();
+
+    // First pass: build all nodes
+    for (i, m) in menus.iter().enumerate() {
+        let ctx = compute_menu_context(m);
+
+        let mut router = RouterConfig {
+            hidden: m.visible == "1",
+            name: if ctx.is_frame {
+                String::new()
+            } else {
+                capitalize(&m.path)
+            },
+            path: get_router_path(m, &ctx),
+            component: get_component(m, &ctx),
+            query: m.query.clone(),
+            meta: Some(ctx.meta),
+            always_show: None,
+            redirect: None,
+            children: None,
+        };
+
+        // Special case: frame route (root + menu + noFrame)
+        if ctx.is_frame {
+            let child_meta = RouterMeta {
+                title: m.menu_name.clone(),
+                icon: m.icon.clone(),
+                no_cache: m.is_cache == "1",
+                link: None,
+            };
+            router.meta = None;
+            router.children = Some(vec![RouterConfig {
+                hidden: false,
+                name: capitalize(&m.path),
+                path: m.path.clone(),
+                component: m.component.clone().unwrap_or_default(),
+                query: m.query.clone(),
+                meta: Some(child_meta),
+                always_show: None,
+                redirect: None,
+                children: None,
+            }]);
+        } else if ctx.is_root && ctx.is_inner {
+            // Inner link at root
+            let inner_path = inner_link_replace_each(&m.path);
+            router.meta = Some(RouterMeta {
+                title: m.menu_name.clone(),
+                icon: m.icon.clone(),
+                no_cache: false,
+                link: None,
+            });
+            router.path = "/".to_string();
+            router.children = Some(vec![RouterConfig {
+                hidden: false,
+                name: capitalize(&m.menu_name),
+                path: inner_path,
+                component: INNER_LINK.to_string(),
+                query: None,
+                meta: Some(RouterMeta {
+                    title: m.menu_name.clone(),
+                    icon: m.icon.clone(),
+                    no_cache: false,
+                    link: Some(m.path.clone()),
+                }),
+                always_show: None,
+                redirect: None,
+                children: None,
+            }]);
+        } else if ctx.is_dir {
+            // Directory: initialize empty children (marks it as a directory)
+            router.children = Some(Vec::new());
+        }
+
+        routers.push(router);
+        id_to_idx.insert(&m.menu_id, i);
+
+        if ctx.is_root {
+            root_indices.push(i);
+        } else {
+            let parent_id = m.parent_id.as_deref().unwrap_or("");
+            pending_children.push((i, parent_id));
+        }
+    }
+
+    // Second pass: attach children to parents.
+    // We collect assignments first, then apply them using Option slots.
+    let mut child_assignments: Vec<(usize, usize)> = Vec::new();
+    let mut orphan_indices: Vec<usize> = Vec::new();
+
+    for &(child_idx, parent_id) in &pending_children {
+        if let Some(&parent_idx) = id_to_idx.get(parent_id) {
+            // Check if parent is a directory (has children Some)
+            if routers[parent_idx].children.is_some() {
+                child_assignments.push((parent_idx, child_idx));
+            }
+            // else: parent exists but isn't a directory — do not attach
+        } else {
+            // Parent not found — treat as root
+            orphan_indices.push(child_idx);
+        }
+    }
+
+    // Convert to Option<RouterConfig> for easy take semantics
+    let mut slots: Vec<Option<RouterConfig>> = routers.into_iter().map(Some).collect();
+
+    for (parent_idx, child_idx) in &child_assignments {
+        if let Some(child) = slots[*child_idx].take() {
+            if let Some(ref mut parent) = slots[*parent_idx] {
+                let children = parent.children.get_or_insert_with(Vec::new);
+                // Set alwaysShow + redirect on first child added
+                if children.is_empty() {
+                    parent.always_show = Some(true);
+                    parent.redirect = Some("noRedirect".to_string());
+                }
+                children.push(child);
+            }
+        }
+    }
+
+    // Build result: root items + orphans (in original order)
+    let mut result: Vec<RouterConfig> = Vec::new();
+    for idx in root_indices {
+        if let Some(router) = slots[idx].take() {
+            result.push(router);
+        }
+    }
+    for idx in orphan_indices {
+        if let Some(router) = slots[idx].take() {
+            result.push(router);
+        }
+    }
+
+    result
 }

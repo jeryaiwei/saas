@@ -77,9 +77,48 @@ pub struct CaptchaCodeResponseDto {
     pub img: String,
 }
 
+// ---------------------------------------------------------------------------
+// Router menu tree response (GET /routers)
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct CurrentUserInfoResponseDto {
+pub struct RouterMeta {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    pub no_cache: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RouterConfig {
+    pub hidden: bool,
+    pub name: String,
+    pub path: String,
+    pub component: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RouterMeta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub always_show: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub redirect: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<RouterConfig>>,
+}
+
+// ---------------------------------------------------------------------------
+// Current user info
+// ---------------------------------------------------------------------------
+
+/// Nested user profile — matches NestJS frontend contract
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UserProfileDto {
     pub user_id: String,
     pub user_name: String,
     pub nick_name: String,
@@ -92,6 +131,13 @@ pub struct CurrentUserInfoResponseDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub platform_id: Option<String>,
     pub is_admin: bool,
+}
+
+/// Response for GET /info — frontend expects { user, permissions, roles }
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentUserInfoResponseDto {
+    pub user: UserProfileDto,
     pub roles: Vec<String>,
-    pub permissions: Vec<String>,
+    pub permissions: Vec<String>,   
 }

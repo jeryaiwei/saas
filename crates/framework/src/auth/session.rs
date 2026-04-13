@@ -22,6 +22,14 @@ pub struct UserSession {
     pub user_name: String,
     /// `"10"` = CUSTOM (backend) / `"20"` = CLIENT (C-end).
     pub user_type: String,
+    #[serde(default)]
+    pub nick_name: String,
+    #[serde(default)]
+    pub avatar: String,
+    #[serde(default)]
+    pub email: String,
+    #[serde(default)]
+    pub phonenumber: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tenant_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -182,6 +190,10 @@ mod tests {
             user_id: "u1".into(),
             user_name: "alice".into(),
             user_type: "10".into(),
+            nick_name: "Alice".into(),
+            avatar: "".into(),
+            email: "alice@test.com".into(),
+            phonenumber: "13800000000".into(),
             tenant_id: Some("t0".into()),
             platform_id: Some("p0".into()),
             sys_code: None,

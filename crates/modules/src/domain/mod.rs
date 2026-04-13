@@ -59,6 +59,7 @@ pub use mail_template_repo::{
 };
 pub use menu_repo::{
     MenuInsertParams, MenuListFilter, MenuRepo, MenuTreeRow, MenuUpdateParams, RoleMenuTreeRow,
+    RouterMenuItem,
 };
 pub use notice_repo::{NoticeInsertParams, NoticeListFilter, NoticeRepo, NoticeUpdateParams};
 pub use notify_message_repo::{
