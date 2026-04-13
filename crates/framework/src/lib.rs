@@ -10,8 +10,6 @@
 //! - [`i18n`]      — runtime message lookup with `{placeholder}` substitution
 //! - [`telemetry`] — tracing init + Prometheus metrics recorder
 //!
-//! Gate 2 of the Phase 0 scaffold. Middlewares, JWT, infra, and auth come in
-//! Gate 3-4.
 
 pub mod auth;
 pub mod config;

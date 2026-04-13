@@ -1,9 +1,7 @@
 //! Domain layer — entity structs (sqlx rows) and repositories.
 //!
-//! Phase 0 models the tables needed for login → /info flow. Phase 1
-//! adds `role_repo`. Audit + tenant-scope helpers that used to live
-//! here under `common.rs` have been promoted to `framework::context`
-//! (they're pure `RequestContext` readers with no domain knowledge).
+//! Audit + tenant-scope helpers live in `framework::context`
+//! (pure `RequestContext` readers with no domain knowledge).
 
 pub mod config_repo;
 pub mod constants;

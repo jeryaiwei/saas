@@ -1,8 +1,6 @@
-//! Declarative macros that shortcut the verbose `route_layer(from_fn_with_state(...))`
-//! pattern for permission/role/scope gates. Expand at call site into the
-//! same code you would have written by hand — no proc macros, no extra
-//! compile time, `cargo expand` shows the exact result.
-//! `operlog!` macro — shorthand for `OperlogMarkLayer::new(title, business_type)`.
+//! Declarative macros for route-level middleware layers:
+//! - `require_permission!` / `require_role!` / `require_scope!` / `require_authenticated!` / `require_access!` — access control
+//! - `operlog!` — operation log recording via `OperlogLayer`
 
 /// Build a route-level layer that requires a specific permission string.
 ///
@@ -144,10 +142,10 @@ macro_rules! __require_access_set {
     };
 }
 
-/// Route-level layer that marks a handler for operation logging.
+/// Route-level layer that records operation logs to `sys_oper_log`.
 ///
-/// The global `operlog::global_operlog` middleware (applied in main.rs)
-/// reads this mark and writes the log after handler execution.
+/// `OperlogLayer` buffers request/response body and writes the log
+/// asynchronously via `scope_spawn`. PgPool is read from `Extension<PgPool>`.
 ///
 /// ```ignore
 /// use framework::operlog;

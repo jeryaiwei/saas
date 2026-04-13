@@ -1,14 +1,12 @@
 //! app — binary entry point.
 //!
-//! Assembles the Phase 0 HTTP server end-to-end:
-//!
 //! ```text
 //! load_config
 //!   ├─ init_tracing (file + stdout)
 //!   ├─ init_metrics (Prometheus recorder)
 //!   ├─ PgPool::connect_lazy
 //!   ├─ RedisPool::build
-//!   ├─ build_router (modules::router + global layers)
+//!   ├─ build_router (modules::api_router_and_openapi + swagger-ui + layers)
 //!   └─ axum::serve(listener, app).with_graceful_shutdown(SIGINT | SIGTERM)
 //! ```
 
@@ -86,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
         tenant: Arc::new(cfg.tenant.clone()),
     };
 
-    // 7. CORS (Phase 0: allow-any in dev; explicit list in prod)
+    // 7. CORS (allow-any in dev; explicit list in prod)
     let cors = build_cors(&cfg);
 
     // 8. Router assembly

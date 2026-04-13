@@ -1,5 +1,4 @@
-//! Phase 0 entity structs — only the fields we actually read during the
-//! login and /info flows. Extend as new endpoints land.
+//! Entity structs — `#[derive(FromRow)]` for sqlx query mapping.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;

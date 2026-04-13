@@ -1,7 +1,5 @@
-//! System (backend management) endpoints.
-//!
-//! Phase 1 sub-phase 1 adds only the `role` module. Subsequent sub-phases
-//! add user, menu, dept, post, dict, config, tenant.
+//! System management endpoints — config, dept, dict, menu, post, role,
+//! tenant, tenant_package, user.
 
 pub mod config;
 pub mod dept;

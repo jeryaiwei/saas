@@ -1,6 +1,6 @@
 //! OpenAPI global metadata — info, tags, security scheme.
 //!
-//! Per-module paths are registered via `register_modules!` in `lib.rs`.
+//! Per-module paths are collected by `OpenApiRouter::merge` in `lib.rs`.
 //! This file only defines the shell struct with global metadata.
 
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
