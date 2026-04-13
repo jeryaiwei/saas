@@ -396,9 +396,19 @@ pub async fn select_list(state: &AppState) -> Result<Vec<TenantSelectOptionDto>,
         .as_deref()
         .ok_or_else(|| AppError::auth(ResponseCode::TOKEN_EXPIRED))?;
     let current_tid = ctx.tenant_id.as_deref().unwrap_or("");
-    let is_super = ctx.tenant_id.as_deref() == Some(SUPER_TENANT_ID) && ctx.is_admin;
-    let is_platform =
-        ctx.is_admin && ctx.tenant_id.is_some() && ctx.tenant_id == ctx.platform_id && !is_super;
+
+    // Determine admin level from DB bindings (not session — session may reflect a switched state)
+    let user_tenants = UserRepo::find_user_tenants(&state.pg, user_id)
+        .await
+        .into_internal()?;
+    let is_super = user_tenants
+        .iter()
+        .any(|t| t.tenant_id == SUPER_TENANT_ID && t.is_admin_flag());
+    let is_platform = !is_super
+        && ctx.platform_id.is_some()
+        && user_tenants
+            .iter()
+            .any(|t| Some(t.tenant_id.as_str()) == ctx.platform_id.as_deref() && t.is_admin_flag());
 
     let rows: Vec<(String, String)> = if is_super {
         // Super admin: all active tenants
@@ -499,11 +509,19 @@ async fn switch_to_tenant(
         }
     }
 
-    // 5. Permission check — super admin can switch anywhere
-    let is_super =
-        old_session.tenant_id.as_deref() == Some(SUPER_TENANT_ID) && old_session.is_admin;
-    let is_platform =
-        old_session.is_admin && old_session.tenant_id == old_session.platform_id && !is_super;
+    // 5. Permission check — determine admin level from DB bindings (not session,
+    //    which may reflect a switched state where super admin looks like a regular user).
+    let user_tenants = UserRepo::find_user_tenants(&state.pg, user_id)
+        .await
+        .into_internal()?;
+    let is_super = user_tenants
+        .iter()
+        .any(|t| t.tenant_id == SUPER_TENANT_ID && t.is_admin_flag());
+    let is_platform = !is_super
+        && old_session.platform_id.is_some()
+        && user_tenants.iter().any(|t| {
+            Some(t.tenant_id.as_str()) == old_session.platform_id.as_deref() && t.is_admin_flag()
+        });
 
     if !is_super {
         if is_platform {
@@ -565,10 +583,7 @@ async fn switch_to_tenant(
         .into_internal()?;
     }
 
-    // 7. Determine isAdmin in target tenant
-    let user_tenants = UserRepo::find_user_tenants(&state.pg, user_id)
-        .await
-        .into_internal()?;
+    // 7. Determine isAdmin in target tenant (reuse user_tenants from step 5)
     let target_is_admin = if is_super {
         true
     } else {
