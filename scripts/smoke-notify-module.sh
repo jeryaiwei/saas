@@ -140,7 +140,7 @@ UNREAD_RESP=$(curl -sS "$BASE/message/notify-message/unread-count" "${H[@]}")
 echo "$UNREAD_RESP" | python3 -m json.tool
 UNREAD_CODE=$(echo "$UNREAD_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])")
 assert_eq 200 "$UNREAD_CODE" "unread-count returns code=200"
-UNREAD_COUNT=$(echo "$UNREAD_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'])")
+UNREAD_COUNT=$(echo "$UNREAD_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin)['data']; print(d if isinstance(d,int) else d.get('count',0))")
 assert_eq true "$([ "$UNREAD_COUNT" -ge 1 ] && echo true || echo false)" "unread count >= 1 (got $UNREAD_COUNT)"
 
 # ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ assert_eq 200 "$READ_CODE" "mark read returns code=200"
 # ---------------------------------------------------------------------------
 step "10. verify unread count decreased"
 UNREAD_AFTER=$(curl -sS "$BASE/message/notify-message/unread-count" "${H[@]}")
-UNREAD_COUNT_AFTER=$(echo "$UNREAD_AFTER" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'])")
+UNREAD_COUNT_AFTER=$(echo "$UNREAD_AFTER" | python3 -c "import sys,json; d=json.load(sys.stdin)['data']; print(d if isinstance(d,int) else d.get('count',0))")
 assert_eq true "$([ "$UNREAD_COUNT_AFTER" -lt "$UNREAD_COUNT" ] && echo true || echo false)" "unread count decreased (was $UNREAD_COUNT, now $UNREAD_COUNT_AFTER)"
 
 # ---------------------------------------------------------------------------
