@@ -5,7 +5,7 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use modules::system::oper_log::{dto as oper_log_dto, service as oper_log_service};
+use modules::monitor::oper_log::{dto as oper_log_dto, service as oper_log_service};
 
 const PREFIX: &str = "it-operlog-";
 

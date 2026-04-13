@@ -3,6 +3,8 @@
 pub mod auth;
 pub mod domain;
 pub mod health;
+pub mod message;
+pub mod monitor;
 pub mod openapi;
 pub mod state;
 pub mod system;
@@ -19,19 +21,23 @@ use utoipa_axum::router::OpenApiRouter;
 /// Adding a new module = adding one `.merge(...)` line here.
 fn api_openapi_router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
+        // auth
         .merge(auth::router())
+        // system
         .merge(system::config::router())
         .merge(system::dept::router())
         .merge(system::dict::router())
-        .merge(system::login_log::router())
         .merge(system::menu::router())
-        .merge(system::notice::router())
-        .merge(system::oper_log::router())
         .merge(system::post::router())
         .merge(system::role::router())
         .merge(system::tenant::router())
         .merge(system::tenant_package::router())
         .merge(system::user::router())
+        // message
+        .merge(message::notice::router())
+        // monitor
+        .merge(monitor::oper_log::router())
+        .merge(monitor::login_log::router())
 }
 
 /// Split into axum Router + OpenAPI spec. Called by `app::main`.

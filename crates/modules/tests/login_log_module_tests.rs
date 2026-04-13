@@ -4,7 +4,7 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use modules::system::login_log::{dto as login_log_dto, service as login_log_service};
+use modules::monitor::login_log::{dto as login_log_dto, service as login_log_service};
 
 const PREFIX: &str = "it-loginlog-";
 

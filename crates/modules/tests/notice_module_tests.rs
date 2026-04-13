@@ -5,7 +5,7 @@ mod common;
 
 use framework::error::AppError;
 use framework::response::ResponseCode;
-use modules::system::notice::{dto as notice_dto, service as notice_service};
+use modules::message::notice::{dto as notice_dto, service as notice_service};
 
 const PREFIX: &str = "it-notice-";
 

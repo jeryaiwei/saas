@@ -6,10 +6,7 @@
 pub mod config;
 pub mod dept;
 pub mod dict;
-pub mod login_log;
 pub mod menu;
-pub mod notice;
-pub mod oper_log;
 pub mod post;
 pub mod role;
 pub mod tenant;
