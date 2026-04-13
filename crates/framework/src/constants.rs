@@ -1,20 +1,14 @@
 //! Platform-level identity constants shared between the framework
 //! layer (middleware, access checks) and the modules layer (repos,
-//! services). These live in `framework/` rather than in any single
-//! module because middleware needs them to enforce `Role::SuperAdmin`
-//! / `Role::SuperTenant` / `Scope::Client` checks without reaching
-//! into the `modules` crate.
-//!
-//! Phase 1 assumption: single-platform deployment. When multi-platform
-//! support lands in Phase 2, `PLATFORM_ID_DEFAULT` becomes a runtime
-//! lookup (probably from `RequestContext`) instead of a compile-time
-//! constant.
+//! services).
 
-/// Default platform id. All Phase 1 deployments run under a single
-/// platform with this id — the value also doubles as the super-tenant
-/// id (`SUPER_TENANT_ID` in NestJS parlance) for role checks like
-/// `Role::SuperAdmin` (`is_admin && tenant_id == "000000"`).
-pub const PLATFORM_ID_DEFAULT: &str = "000000";
+/// 超级租户 ID。种子数据固定为 `"000000"`，系统中唯一。
+/// 用于判断超级管理员、超级租户等角色。
+pub const SUPER_TENANT_ID: &str = "000000";
+
+/// 默认平台 ID — 与超级租户 ID 相同。
+/// 语义上指"新用户的默认 platform_id"时使用。
+pub const PLATFORM_ID_DEFAULT: &str = SUPER_TENANT_ID;
 
 /// `sys_user.user_type` for CUSTOM (backend admin) users.
 pub const USER_TYPE_CUSTOM: &str = "10";

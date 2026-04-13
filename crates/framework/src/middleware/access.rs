@@ -32,7 +32,7 @@
 
 use crate::auth::access_spec::{AccessSpec, Role, Scope};
 use crate::auth::session::UserSession;
-use crate::constants::{PLATFORM_ID_DEFAULT, USER_TYPE_CLIENT, USER_TYPE_CUSTOM};
+use crate::constants::{SUPER_TENANT_ID, USER_TYPE_CLIENT, USER_TYPE_CUSTOM};
 use crate::error::AppError;
 use crate::response::ResponseCode;
 use axum::{
@@ -85,9 +85,9 @@ fn check(spec: &AccessSpec, session: &UserSession) -> Result<(), AppError> {
     if let Some(role) = spec.role {
         let ok = match role {
             Role::SuperAdmin => {
-                session.is_admin && session.tenant_id.as_deref() == Some(PLATFORM_ID_DEFAULT)
+                session.is_admin && session.tenant_id.as_deref() == Some(SUPER_TENANT_ID)
             }
-            Role::SuperTenant => session.tenant_id.as_deref() == Some(PLATFORM_ID_DEFAULT),
+            Role::SuperTenant => session.tenant_id.as_deref() == Some(SUPER_TENANT_ID),
             Role::PlatformAdmin => session.is_admin && session.tenant_id == session.platform_id,
             Role::TenantAdmin => session.is_admin,
         };

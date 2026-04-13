@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use std::future::Future;
 
 use crate::auth::Role;
-use crate::constants::PLATFORM_ID_DEFAULT;
+use crate::constants::SUPER_TENANT_ID;
 
 #[derive(Debug, Clone, Default)]
 pub struct RequestContext {
@@ -48,9 +48,9 @@ impl RequestContext {
 
     /// Derive the highest role from current context fields.
     pub fn get_role(&self) -> Option<Role> {
-        if self.is_admin && self.tenant_id.as_deref() == Some(PLATFORM_ID_DEFAULT) {
+        if self.is_admin && self.tenant_id.as_deref() == Some(SUPER_TENANT_ID) {
             Some(Role::SuperAdmin)
-        } else if self.tenant_id.as_deref() == Some(PLATFORM_ID_DEFAULT) {
+        } else if self.tenant_id.as_deref() == Some(SUPER_TENANT_ID) {
             Some(Role::SuperTenant)
         } else if self.is_admin && self.tenant_id == self.platform_id {
             Some(Role::PlatformAdmin)

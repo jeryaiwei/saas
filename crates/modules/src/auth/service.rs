@@ -8,7 +8,7 @@ use crate::domain::UserRepo;
 use crate::state::AppState;
 use anyhow::Context;
 use framework::auth::{jwt, session, JwtClaims, UserSession};
-use framework::constants::PLATFORM_ID_DEFAULT;
+use framework::constants::SUPER_TENANT_ID;
 use framework::error::{AppError, BusinessCheckOption, IntoAppError};
 use framework::infra::{captcha, crypto};
 use framework::response::ResponseCode;
@@ -50,13 +50,11 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
 
     let is_super_admin = user_tenants
         .iter()
-        .any(|t| t.tenant_id == PLATFORM_ID_DEFAULT && t.is_admin_flag());
+        .any(|t| t.tenant_id == SUPER_TENANT_ID && t.is_admin_flag());
 
     let (chosen_tenant_id, is_admin) = if is_super_admin {
         // Super admin: use explicit tenantId or default to super tenant
-        let tid = dto
-            .tenant_id
-            .unwrap_or_else(|| PLATFORM_ID_DEFAULT.to_string());
+        let tid = dto.tenant_id.unwrap_or_else(|| SUPER_TENANT_ID.to_string());
         (Some(tid), true)
     } else if let Some(explicit_tid) = &dto.tenant_id {
         // Explicit tenant selection: verify binding exists
@@ -77,7 +75,7 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
 
     // 4b. Validate tenant status (skip for super tenant).
     if let Some(tid) = chosen_tenant_id.as_deref() {
-        if tid != PLATFORM_ID_DEFAULT {
+        if tid != SUPER_TENANT_ID {
             let tenant_row: Option<(String, Option<chrono::DateTime<chrono::Utc>>)> =
                 sqlx::query_as(
                     "SELECT status, expire_time FROM sys_tenant \
