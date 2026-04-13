@@ -12,7 +12,7 @@
 //! legacy backend during the progressive-migration window.
 
 use crate::config::RedisKeyConfig;
-use crate::infra::redis::RedisPool;
+use crate::infra::redis::{RedisExt, RedisPool};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
@@ -48,19 +48,7 @@ pub async fn fetch(
     uuid: &str,
 ) -> anyhow::Result<Option<UserSession>> {
     let key = format!("{}{}", keys.login_session, uuid);
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let raw: Option<String> = redis::cmd("GET")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .context("redis GET session")?;
-    match raw {
-        None => Ok(None),
-        Some(json) => {
-            let sess: UserSession = serde_json::from_str(&json).context("parse session json")?;
-            Ok(Some(sess))
-        }
-    }
+    pool.get_json(&key).await
 }
 
 /// Write (or replace) the session payload under the JWT `uuid`.
@@ -73,29 +61,14 @@ pub async fn store(
     ttl_sec: u64,
 ) -> anyhow::Result<()> {
     let key = format!("{}{}", keys.login_session, uuid);
-    let json = serde_json::to_string(session)?;
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let _: () = redis::cmd("SETEX")
-        .arg(&key)
-        .arg(ttl_sec)
-        .arg(&json)
-        .query_async(&mut conn)
-        .await
-        .context("redis SETEX session")?;
-    Ok(())
+    pool.set_ex(&key, session, ttl_sec).await
 }
 
 /// Delete the session (logout).
 #[tracing::instrument(skip_all, fields(uuid = %uuid))]
 pub async fn delete(pool: &RedisPool, keys: &RedisKeyConfig, uuid: &str) -> anyhow::Result<()> {
     let key = format!("{}{}", keys.login_session, uuid);
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let _: i64 = redis::cmd("DEL")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .context("redis DEL session")?;
-    Ok(())
+    pool.del(&key).await
 }
 
 /// Add a token `uuid` to the single-token blacklist (logout of one device).
@@ -108,15 +81,7 @@ pub async fn blacklist(
 ) -> anyhow::Result<()> {
     let key = format!("{}{}", keys.token_blacklist, uuid);
     let now_ms = chrono::Utc::now().timestamp_millis().to_string();
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let _: () = redis::cmd("SETEX")
-        .arg(&key)
-        .arg(ttl_sec)
-        .arg(&now_ms)
-        .query_async(&mut conn)
-        .await
-        .context("redis SETEX blacklist")?;
-    Ok(())
+    pool.set_ex_raw(&key, &now_ms, ttl_sec).await
 }
 
 /// Check whether a token `uuid` has been blacklisted.
@@ -127,13 +92,7 @@ pub async fn is_blacklisted(
     uuid: &str,
 ) -> anyhow::Result<bool> {
     let key = format!("{}{}", keys.token_blacklist, uuid);
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let exists: i64 = redis::cmd("EXISTS")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .context("redis EXISTS blacklist")?;
-    Ok(exists > 0)
+    Ok(pool.get_raw(&key).await?.is_some())
 }
 
 /// Read the current per-user token version (used to invalidate all tokens
@@ -145,12 +104,7 @@ pub async fn get_user_token_version(
     user_id: &str,
 ) -> anyhow::Result<Option<i64>> {
     let key = format!("{}{}", keys.user_token_version, user_id);
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let v: Option<String> = redis::cmd("GET")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .context("redis GET token version")?;
+    let v = pool.get_raw(&key).await?;
     Ok(v.and_then(|s| s.parse().ok()))
 }
 
@@ -211,16 +165,7 @@ pub async fn store_switch_original(
     ttl_sec: u64,
 ) -> anyhow::Result<()> {
     let key = format!("{SWITCH_ORIGINAL_PREFIX}{uuid}");
-    let json = serde_json::to_string(original).context("serialize switch original")?;
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let _: () = redis::cmd("SETEX")
-        .arg(&key)
-        .arg(ttl_sec)
-        .arg(&json)
-        .query_async(&mut conn)
-        .await
-        .context("redis SETEX switch original")?;
-    Ok(())
+    pool.set_ex(&key, original, ttl_sec).await
 }
 
 /// Fetch the pre-switch state. Returns `None` if user hasn't switched.
@@ -230,32 +175,14 @@ pub async fn fetch_switch_original(
     uuid: &str,
 ) -> anyhow::Result<Option<SwitchOriginal>> {
     let key = format!("{SWITCH_ORIGINAL_PREFIX}{uuid}");
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let raw: Option<String> = redis::cmd("GET")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .context("redis GET switch original")?;
-    match raw {
-        Some(json) => {
-            let orig = serde_json::from_str(&json).context("deserialize switch original")?;
-            Ok(Some(orig))
-        }
-        None => Ok(None),
-    }
+    pool.get_json(&key).await
 }
 
 /// Delete the pre-switch state after restore.
 #[tracing::instrument(skip_all, fields(uuid = %uuid))]
 pub async fn delete_switch_original(pool: &RedisPool, uuid: &str) -> anyhow::Result<()> {
     let key = format!("{SWITCH_ORIGINAL_PREFIX}{uuid}");
-    let mut conn = pool.get().await.context("redis get conn")?;
-    let _: i64 = redis::cmd("DEL")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .context("redis DEL switch original")?;
-    Ok(())
+    pool.del(&key).await
 }
 
 #[cfg(test)]

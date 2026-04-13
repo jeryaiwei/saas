@@ -12,7 +12,8 @@
 //! replace [`CaptchaCode::image`] with an actual SVG/PNG payload.
 
 use crate::config::{RedisKeyConfig, RedisTtlConfig};
-use crate::infra::redis::RedisPool;
+use crate::infra::redis::{RedisExt, RedisPool};
+
 #[derive(Debug, Clone)]
 pub struct CaptchaCode {
     pub uuid: String,
@@ -32,18 +33,7 @@ pub async fn generate_and_store(
         .map(|_| rand::random_range(0..10).to_string())
         .collect();
     let key = format!("{}{}", keys.captcha, uuid);
-
-    let mut conn = pool
-        .get()
-        .await
-        .map_err(|e| anyhow::anyhow!("redis get conn: {e}"))?;
-    let _: () = redis::cmd("SETEX")
-        .arg(&key)
-        .arg(ttl.captcha)
-        .arg(&text)
-        .query_async(&mut conn)
-        .await
-        .map_err(|e| anyhow::anyhow!("redis SETEX captcha: {e}"))?;
+    pool.set_ex_raw(&key, &text, ttl.captcha).await?;
 
     Ok(CaptchaCode {
         uuid,
@@ -61,23 +51,9 @@ pub async fn verify_and_consume(
     input: &str,
 ) -> anyhow::Result<bool> {
     let key = format!("{}{}", keys.captcha, uuid);
-    let mut conn = pool
-        .get()
-        .await
-        .map_err(|e| anyhow::anyhow!("redis get conn: {e}"))?;
-
-    let stored: Option<String> = redis::cmd("GET")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .map_err(|e| anyhow::anyhow!("redis GET captcha: {e}"))?;
-
+    let stored = pool.get_raw(&key).await?;
     // Single-use — delete regardless of match outcome.
-    let _: i64 = redis::cmd("DEL")
-        .arg(&key)
-        .query_async(&mut conn)
-        .await
-        .map_err(|e| anyhow::anyhow!("redis DEL captcha: {e}"))?;
+    pool.del(&key).await?;
 
     Ok(match stored {
         Some(expected) => expected.eq_ignore_ascii_case(input),
