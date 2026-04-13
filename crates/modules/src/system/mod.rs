@@ -5,6 +5,7 @@ pub mod audit_log;
 pub mod config;
 pub mod dept;
 pub mod dict;
+pub mod file_manager;
 pub mod menu;
 pub mod post;
 pub mod role;

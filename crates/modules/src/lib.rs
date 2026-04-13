@@ -35,6 +35,7 @@ fn api_openapi_router() -> OpenApiRouter<AppState> {
         .merge(system::tenant_package::router())
         .merge(system::tenant_dashboard::router())
         .merge(system::user::router())
+        .merge(system::file_manager::router())
         // message
         .merge(message::notice::router())
         .merge(message::notify_template::router())

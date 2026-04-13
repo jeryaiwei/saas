@@ -16,6 +16,9 @@ pub use audit::{audit_update_by, current_platform_scope, current_tenant_scope, A
 use std::cell::RefCell;
 use std::future::Future;
 
+use crate::auth::Role;
+use crate::constants::PLATFORM_ID_DEFAULT;
+
 #[derive(Debug, Clone, Default)]
 pub struct RequestContext {
     pub request_id: Option<String>,
@@ -41,6 +44,21 @@ impl RequestContext {
         CURRENT_CTX
             .try_with(|c| c.borrow().clone())
             .unwrap_or_default()
+    }
+
+    /// Derive the highest role from current context fields.
+    pub fn get_role(&self) -> Option<Role> {
+        if self.is_admin && self.tenant_id.as_deref() == Some(PLATFORM_ID_DEFAULT) {
+            Some(Role::SuperAdmin)
+        } else if self.tenant_id.as_deref() == Some(PLATFORM_ID_DEFAULT) {
+            Some(Role::SuperTenant)
+        } else if self.is_admin && self.tenant_id == self.platform_id {
+            Some(Role::PlatformAdmin)
+        } else if self.is_admin {
+            Some(Role::TenantAdmin)
+        } else {
+            None
+        }
     }
 
     /// Run a closure with an immutable reference to the current context.

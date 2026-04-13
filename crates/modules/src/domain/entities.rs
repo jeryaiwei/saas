@@ -510,3 +510,61 @@ pub struct SysAuditLog {
     pub duration: i32,
     pub create_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysFileFolder {
+    pub folder_id: String,
+    pub tenant_id: String,
+    pub parent_id: Option<String>,
+    pub folder_name: String,
+    pub folder_path: String,
+    pub order_num: i32,
+    pub status: String,
+    pub del_flag: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysUpload {
+    pub upload_id: String,
+    pub tenant_id: String,
+    pub folder_id: String,
+    pub size: i32,
+    pub file_name: String,
+    pub new_file_name: String,
+    pub url: String,
+    pub ext: Option<String>,
+    pub mime_type: Option<String>,
+    pub storage_type: String,
+    pub file_md5: Option<String>,
+    pub thumbnail: Option<String>,
+    pub parent_file_id: Option<String>,
+    pub version: i32,
+    pub is_latest: bool,
+    pub download_count: i32,
+    pub status: String,
+    pub del_flag: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+    pub update_by: String,
+    pub update_at: DateTime<Utc>,
+    pub remark: Option<String>,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct SysFileShare {
+    pub share_id: String,
+    pub tenant_id: String,
+    pub upload_id: String,
+    pub share_code: Option<String>,
+    pub expire_time: Option<DateTime<Utc>>,
+    pub max_download: i32,
+    pub download_count: i32,
+    pub status: String,
+    pub create_by: String,
+    pub create_at: DateTime<Utc>,
+}

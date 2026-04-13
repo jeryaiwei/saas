@@ -61,6 +61,12 @@ impl ResponseCode {
     pub const TENANT_PACKAGE_NAME_EXISTS: Self = Self(4022);
     pub const TENANT_PACKAGE_IN_USE: Self = Self(4023);
 
+    // --- 5000-5039 file ---
+    pub const FOLDER_NOT_FOUND: Self = Self(5010);
+    pub const FOLDER_HAS_SUBFOLDERS: Self = Self(5011);
+    pub const FILE_NOT_FOUND: Self = Self(5020);
+    pub const SHARE_NOT_FOUND: Self = Self(5030);
+
     // --- 7000-7099 system module ---
     pub const DEPT_NOT_FOUND: Self = Self(7010);
     pub const DEPT_PARENT_NOT_FOUND: Self = Self(7014);

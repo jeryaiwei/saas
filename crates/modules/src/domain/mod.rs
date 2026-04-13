@@ -10,6 +10,8 @@ pub mod dept_repo;
 pub mod dict_data_repo;
 pub mod dict_type_repo;
 pub mod entities;
+pub mod file_folder_repo;
+pub mod file_share_repo;
 pub mod login_log_repo;
 pub mod mail_account_repo;
 pub mod mail_log_repo;
@@ -26,6 +28,7 @@ pub mod sms_log_repo;
 pub mod sms_template_repo;
 pub mod tenant_package_repo;
 pub mod tenant_repo;
+pub mod upload_repo;
 pub mod user_repo;
 pub mod validators;
 
@@ -39,11 +42,13 @@ pub use dict_type_repo::{
     DictTypeInsertParams, DictTypeListFilter, DictTypeRepo, DictTypeUpdateParams,
 };
 pub use entities::{
-    SysAuditLog, SysConfig, SysDept, SysDictData, SysDictType, SysLogininfor, SysMailAccount,
-    SysMailLog, SysMailTemplate, SysMenu, SysNotice, SysNotifyMessage, SysNotifyTemplate,
-    SysOperLog, SysPost, SysRole, SysSmsChannel, SysSmsLog, SysSmsTemplate, SysTenant,
-    SysTenantPackage, SysUser, SysUserTenant,
+    SysAuditLog, SysConfig, SysDept, SysDictData, SysDictType, SysFileFolder, SysFileShare,
+    SysLogininfor, SysMailAccount, SysMailLog, SysMailTemplate, SysMenu, SysNotice,
+    SysNotifyMessage, SysNotifyTemplate, SysOperLog, SysPost, SysRole, SysSmsChannel, SysSmsLog,
+    SysSmsTemplate, SysTenant, SysTenantPackage, SysUpload, SysUser, SysUserTenant,
 };
+pub use file_folder_repo::{FileFolderRepo, FolderInsertParams, FolderUpdateParams};
+pub use file_share_repo::{FileShareRepo, ShareInsertParams};
 pub use login_log_repo::{LoginLogListFilter, LoginLogRepo};
 pub use mail_account_repo::{
     MailAccountInsertParams, MailAccountListFilter, MailAccountRepo, MailAccountUpdateParams,
@@ -81,5 +86,8 @@ pub use tenant_package_repo::{
 pub use tenant_repo::{
     AdminUserInfo, TenantInsertParams, TenantListFilter, TenantRepo, TenantUpdateParams,
     TenantWithPackageName,
+};
+pub use upload_repo::{
+    RecycleListFilter, UploadInsertParams, UploadListFilter, UploadRepo, UploadUpdateParams,
 };
 pub use user_repo::{UserInsertParams, UserListFilter, UserRepo, UserUpdateParams};

@@ -38,6 +38,7 @@ use utoipa::OpenApi;
         (name = "服务器监控", description = "服务器系统信息"),
         (name = "缓存监控", description = "Redis 缓存监控与管理"),
         (name = "租户仪表盘", description = "租户统计与仪表盘"),
+        (name = "文件管理", description = "文件夹、文件、分享、回收站管理"),
     ),
     security(("bearer_auth" = [])),
     modifiers(&SecurityAddon),
