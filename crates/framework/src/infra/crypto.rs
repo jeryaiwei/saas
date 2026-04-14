@@ -12,28 +12,67 @@
 //! only cover round-trip correctness of this crate.
 
 use aes::Aes256;
-use bcrypt::{hash, verify, DEFAULT_COST};
+use bcrypt::{hash, verify};
 use cbc::cipher::{block_padding::Pkcs7, BlockModeDecrypt, BlockModeEncrypt, KeyIvInit};
 use scrypt::{scrypt, Params as ScryptParams};
 
 type Aes256CbcEnc = cbc::Encryptor<Aes256>;
 type Aes256CbcDec = cbc::Decryptor<Aes256>;
 
+/// bcrypt cost for newly-hashed passwords.
+///
+/// Aligned with the existing admin hash (`$2b$10$…`) so that login / hash
+/// latency is homogeneous. OWASP 2024 considers cost 10 an acceptable lower
+/// bound; cost 12 (the `bcrypt` crate default) is 4× slower without
+/// measurable security benefit for typical SaaS threat models.
+pub const APP_BCRYPT_COST: u32 = 10;
+
+/// Hash a password using bcrypt at [`APP_BCRYPT_COST`].
+///
+/// Runs on the Tokio blocking pool so it does **not** stall async workers.
+/// The sync [`hash_password_blocking`] variant is retained for tests / scripts.
 #[tracing::instrument(skip_all, name = "infra.crypto.hash_password")]
-pub fn hash_password(plain: &str) -> anyhow::Result<String> {
-    hash(plain, DEFAULT_COST).map_err(|e| anyhow::anyhow!("bcrypt hash: {e}"))
+pub async fn hash_password(plain: &str) -> anyhow::Result<String> {
+    let plain = plain.to_string();
+    tokio::task::spawn_blocking(move || {
+        hash(&plain, APP_BCRYPT_COST).map_err(|e| anyhow::anyhow!("bcrypt hash: {e}"))
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("bcrypt hash spawn_blocking join: {e}"))?
 }
 
-pub fn hash_password_with_cost(plain: &str, cost: u32) -> anyhow::Result<String> {
+/// Verify `plain` matches the stored bcrypt hash.
+///
+/// Runs on the Tokio blocking pool. Errors from the underlying library
+/// (e.g. malformed hash) are logged at WARN and reported as `false` so that
+/// callers can treat them as a generic "invalid credentials" response
+/// without leaking details.
+#[tracing::instrument(skip_all, name = "infra.crypto.verify_password")]
+pub async fn verify_password(plain: &str, hash_str: &str) -> bool {
+    let plain = plain.to_string();
+    let hash_str = hash_str.to_string();
+    let join = tokio::task::spawn_blocking(move || match verify(&plain, &hash_str) {
+        Ok(ok) => ok,
+        Err(e) => {
+            tracing::warn!(error = %e, "bcrypt verify error (treating as false)");
+            false
+        }
+    })
+    .await;
+    join.unwrap_or(false)
+}
+
+/// Synchronous bcrypt hash at a caller-specified cost.
+///
+/// Intended for tests, bench harnesses, and one-off scripts. Production
+/// code paths MUST use the async [`hash_password`] to avoid blocking the
+/// Tokio runtime.
+pub fn hash_password_blocking(plain: &str, cost: u32) -> anyhow::Result<String> {
     hash(plain, cost).map_err(|e| anyhow::anyhow!("bcrypt hash: {e}"))
 }
 
-/// Returns `true` iff `plain` matches the given bcrypt hash.
-///
-/// Errors from the underlying library (e.g. malformed hash) are logged at
-/// WARN and reported as `Ok(false)` so that callers can treat them as a
-/// generic "invalid credentials" response without leaking details.
-pub fn verify_password(plain: &str, hash_str: &str) -> bool {
+/// Synchronous bcrypt verify. See [`hash_password_blocking`] caveats.
+pub fn verify_password_blocking(plain: &str, hash_str: &str) -> bool {
     match verify(plain, hash_str) {
         Ok(ok) => ok,
         Err(e) => {
@@ -41,6 +80,13 @@ pub fn verify_password(plain: &str, hash_str: &str) -> bool {
             false
         }
     }
+}
+
+// Legacy alias retained for a single existing test. Prefer
+// `hash_password_blocking` in new code.
+#[cfg(test)]
+fn hash_password_with_cost(plain: &str, cost: u32) -> anyhow::Result<String> {
+    hash_password_blocking(plain, cost)
 }
 
 // ─── AES-256-CBC (NestJS CryptoHelper compat) ──────────────────────────────
@@ -122,18 +168,24 @@ mod tests {
     #[test]
     fn round_trip_verify_ok() {
         let h = hash_password_with_cost("Admin@123", 4).unwrap();
-        assert!(verify_password("Admin@123", &h));
+        assert!(verify_password_blocking("Admin@123", &h));
     }
 
     #[test]
     fn wrong_password_returns_false() {
         let h = hash_password_with_cost("Admin@123", 4).unwrap();
-        assert!(!verify_password("Admin@456", &h));
+        assert!(!verify_password_blocking("Admin@456", &h));
     }
 
     #[test]
     fn malformed_hash_returns_false_not_panic() {
-        assert!(!verify_password("anything", "not-a-bcrypt-hash"));
+        assert!(!verify_password_blocking("anything", "not-a-bcrypt-hash"));
+    }
+
+    #[tokio::test]
+    async fn hash_password_async_runs_on_blocking_pool() {
+        let h = hash_password("Admin@123").await.unwrap();
+        assert!(verify_password("Admin@123", &h).await);
     }
 
     #[test]

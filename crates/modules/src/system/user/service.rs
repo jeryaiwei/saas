@@ -132,6 +132,7 @@ pub async fn create(
 
     // 3. hash password
     let password_hash = hash_password(&dto.password)
+        .await
         .context("hash_password: create")
         .into_internal()?;
 
@@ -381,6 +382,7 @@ pub async fn reset_password(state: &AppState, dto: ResetPwdDto) -> Result<(), Ap
 
     // Hash the new password
     let password_hash = hash_password(&dto.password)
+        .await
         .context("hash_password: reset")
         .into_internal()?;
 
@@ -587,12 +589,13 @@ pub async fn update_pwd(state: &AppState, dto: UpdatePwdDto) -> Result<(), AppEr
         .or_business(ResponseCode::DATA_NOT_FOUND)?;
 
     // Verify old password
-    if !verify_password(&dto.old_password, &user.password) {
+    if !verify_password(&dto.old_password, &user.password).await {
         return Err(AppError::business(ResponseCode::OLD_PASSWORD_INCORRECT));
     }
 
     // Hash new password
     let password_hash = hash_password(&dto.new_password)
+        .await
         .context("hash_password: update_pwd")
         .into_internal()?;
 

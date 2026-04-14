@@ -12,8 +12,8 @@ server:
 db:
   postgresql:
     url: "postgresql://saas_tea:123456@127.0.0.1:5432/saas_tea"
-    max_connections: 50
-    acquire_timeout_sec: 10
+    max_connections: 80
+    acquire_timeout_sec: 5
     idle_timeout_sec: 300
   redis:
     # ioredis on the NestJS side uses keyPrefix="saas_tea:"; the URL here is

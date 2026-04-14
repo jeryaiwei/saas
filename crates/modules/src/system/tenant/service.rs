@@ -83,6 +83,7 @@ pub async fn create(state: &AppState, dto: CreateTenantDto) -> Result<ApiRespons
 
     // 5. Hash password
     let password_hash = hash_password(&dto.password)
+        .await
         .context("hash_password: create tenant")
         .into_internal()?;
 

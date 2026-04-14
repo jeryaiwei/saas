@@ -41,7 +41,7 @@ pub async fn login(state: &AppState, dto: LoginDto) -> Result<LoginTokenResponse
     }
 
     // 3. Verify password (bcrypt, must accept NestJS-written hashes)
-    if !crypto::verify_password(&dto.password, &user.password) {
+    if !crypto::verify_password(&dto.password, &user.password).await {
         return Err(AppError::business(ResponseCode::INVALID_CREDENTIALS));
     }
 
